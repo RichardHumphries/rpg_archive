@@ -1,0 +1,198 @@
+/**********************************************************************/
+/* PROGRAM     : ABCAsset                                             */
+/* DATE        : 03/04/2006                                           */
+/* CREATED BY  : Richard Humphries                                    */
+/* DESCRIPTION : ABC - Create Asset and Depreciation Extract          */
+/**********************************************************************/
+
+Pgm          Parm( &ProcName )
+
+             Dcl        Var( &ProcName   ) Type( *Char ) Len( 10   )
+             Dcl        Var( &ProgName   ) Type( *Char ) Len( 10   )
+             Dcl        Var( &DvrDesc    ) Type( *Char ) Len( 50   )
+             Dcl        Var( &FromDate   ) Type( *Char ) Len( 10   )
+             Dcl        Var( &ToDate     ) Type( *Char ) Len( 10   )
+             Dcl        Var( &ToFile     ) Type( *Char ) Len( 10   )
+             Dcl        Var( &ToMbr      ) Type( *Char ) Len( 10   )
+             Dcl        Var( &ToDir      ) Type( *Char ) Len( 64   )
+             Dcl        Var( &ToDataFile ) Type( *Char ) Len( 64   )
+             Dcl        Var( &HisFile    ) Type( *Char ) Len( 10   )
+             Dcl        Var( &HisPrefix  ) Type( *Char ) Len(  7   )
+             Dcl        Var( &HisSuffix  ) Type( *Dec  ) Len(  3 0 )
+             Dcl        Var( &HisMbrDesc ) Type( *Char ) Len( 35   )
+             Dcl        Var( &PrcFileExt ) Type( *Char ) Len( 10   )
+             Dcl        Var( &HisSufChar ) Type( *Char ) Len(  3   )
+             Dcl        Var( &HisMbrName ) Type( *Char ) Len( 10   )
+             Dcl        Var( &Date       ) Type( *Char ) Len(  6   )
+             Dcl        Var( &Time       ) Type( *Char ) Len(  6   )
+             Dcl        Var( &ToLib      ) Type( *Char ) Len( 10   )
+             Dcl        Var( &NoRecs     ) Type( *Dec  ) Len( 10 0 )
+             Dcl        Var( &NoRecs2    ) Type( *Dec  ) Len( 10 0 )
+
+/**********************************************************************/
+/*  Get Processing parmeter's                                         */
+/**********************************************************************/
+
+             Call       Pgm(  AbRDvrParm  )                           +
+                        Parm( &ProcName                               +
+                              &ProgName                               +
+                              &DvrDesc                                +
+                              &FromDate                               +
+                              &ToDate                                 +
+                              &ToFile                                 +
+                              &ToMbr                                  +
+                              &ToDir                                  +
+                              &ToDataFile                             +
+                              &HisFile                                +
+                              &HisPrefix                              +
+                              &HisSuffix                              +
+                              &HisMbrDesc                             +
+                              &PrcFileExt )
+
+             ChgVar   Var(   &ToDataFile       )                      +
+                      Value( &ToDir      *TCat                        +
+                             &ToDataFile *TCat                        +
+                             &PrcFileExt       )
+
+/**********************************************************************/
+/*  Clear Assets Workfile                                             */
+/**********************************************************************/
+
+             ClrPfm      File( &ToFile )
+
+/**********************************************************************/
+/*  Change the DDM Files for EUK Core                                 */
+/**********************************************************************/
+
+             ChgDDMF    File(    DDCost            )                  +
+                        RmtFile( HC70EUKD/ISCost   )
+
+             ChgDDMF    File(    DDPAsCJc          )                  +
+                        RmtFile( HC70EUKD/ISPAsCJc )
+
+             ChgDDMF    File(    DDPAsCJd          )                  +
+                        RmtFile( HC70EUKD/ISPAsCJd )
+
+             ChgDDMF    File(    DDISGC            )                  +
+                        RmtFile( FMIS70EUKD/FMISGC )
+
+/**********************************************************************/
+/*  Call Processing Program                                           */
+/**********************************************************************/
+
+             Call       Pgm(  &ProgName    )                          +
+                        Parm( &DvrDesc                                +
+                              &FromDate                               +
+                              &ToDate                                 +
+                              'EUK_Core  ' )
+
+/**********************************************************************/
+/*  If No Records in File then end process as Month-End Asset         */
+/*  Registers have not been closed                                    */
+/**********************************************************************/
+
+             RtvMbrD    File(      &ToFile )                          +
+                        NbrCurRcd( &NoRecs )
+
+             If         ( &NoRecs = 0 )                               +
+                                                                      +
+             Do
+                Goto    EndClear
+             EndDo
+
+/**********************************************************************/
+/*  Change the DDM Files for EUK Direct                               */
+/**********************************************************************/
+
+             ChgDDMF    File(    DDCost            )                  +
+                        RmtFile( HC70BLKD/ISCost   )
+
+             ChgDDMF    File(    DDPAsCJc          )                  +
+                        RmtFile( HC70BLKD/ISPAsCJc )
+
+             ChgDDMF    File(    DDPAsCJd          )                  +
+                        RmtFile( HC70BLKD/ISPAsCJd )
+
+             ChgDDMF    File(    DDISGC            )                  +
+                        RmtFile( FMIS70BLKD/FMISGC )
+
+/**********************************************************************/
+/*  Call Processing Program                                           */
+/**********************************************************************/
+
+             Call       Pgm(  &ProgName    )                          +
+                        Parm( &DvrDesc                                +
+                              &FromDate                               +
+                              &ToDate                                 +
+                              'EUK_Direct' )
+
+/**********************************************************************/
+/*  If No Records in File then end process as Month-End Asset         */
+/*  Registers have not been closed                                    */
+/**********************************************************************/
+
+             RtvMbrD    File(      &ToFile  )                         +
+                        NbrCurRcd( &NoRecs2 )
+
+             If         ( &NoRecs = &NoRecs2 )                        +
+                                                                      +
+             Do
+                Goto    EndClear
+             EndDo
+
+/**********************************************************************/
+/* Copy File to Shared Drive                                          */
+/**********************************************************************/
+
+             CpyToImpF  FromFile(   ABPAssetWF           )            +
+                        ToStmF(     &ToDataFile          )            +
+                        MbrOpt(     *Replace             )            +
+                        StmFCodPag( *StdASCII            )            +
+                        RcdDlm(     *CRLF                )            +
+                        StrDlm(     *None                )            +
+                        FldDlm(     '|'                  )            +
+                        NullInd(    *Yes                 )
+
+/**********************************************************************/
+/* Change Authority so that users have visibility                     */
+/**********************************************************************/
+
+             ChgAut     Obj(    &ToDataFile )                         +
+                        User(   *Public     )                         +
+                        DtaAut( *RWX        )                         +
+                        ObjAut( *All        )
+
+             Goto       End
+
+EndClear:
+
+/**********************************************************************/
+/*  Clear Assets Workfile                                             */
+/**********************************************************************/
+
+             ClrPfm     File( &ToFile )
+
+/**********************************************************************/
+/* End Program                                                        */
+/**********************************************************************/
+
+End:
+
+/**********************************************************************/
+/*  Change the DDM Files for RUBBISH Library so that the DDM Files do */
+/*  not look at 'Live' CODA Files during the rest of the Month        */
+/**********************************************************************/
+
+             ChgDDMF    File(    DDCost            )                  +
+                        RmtFile( RUBBISH/ISCost    )
+
+             ChgDDMF    File(    DDPAsCJc          )                  +
+                        RmtFile( RUBBISH/ISPAsCJc  )
+
+             ChgDDMF    File(    DDPAsCJd          )                  +
+                        RmtFile( RUBBISH/ISPAsCJd  )
+
+             ChgDDMF    File(    DDISGC            )                  +
+                        RmtFile( RUBBISH/FMISGC    )
+
+EndPgm
