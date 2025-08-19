@@ -1,0 +1,132 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   Distibuted Labels                                  */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Entertainment UK Ltd.                              */
+     /* Date:      12th October 2007                                  */
+     /*                                                               */
+     /* Title:     Send Transaction analysis data via E-mail as an    */
+     /*            excel file                                         */
+     /* Program:   DLC238C2                                           */
+     /* Scan:                                                         */
+     /*---------------------------------------------------------------*/
+
+Pgm                     Parm( &EmailAddr +
+                              &User      )
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &EMailAddr  *Char   Len(  50   )
+             Dcl        &User       *Char   Len(  10   )
+             Dcl        &Jul        *Char   Len(   3   )
+             Dcl        &Date       *Char   Len(   6   )
+             Dcl        &JulD       *Char   Len(   6   )
+             Dcl        &FlNumA     *Char   Len(   5   )
+             Dcl        &FlNum      *Dec    Len(   5 0 )  Value( 0 )
+             Dcl        &Member     *Char   Len(  10   )
+
+     /*---------------------------------------------------------------*/
+     /* Get current date and time                                     */
+     /*---------------------------------------------------------------*/
+
+             RtvSysVal  SysVal( QDate )                               +
+                        RtnVar( &Date )
+
+             CvtDat     Date(    &Date   )                            +
+                        ToVar(   &JulD   )                            +
+                        FromFmt( *SysVal )                            +
+                        ToFmt(   *Jul    )                            +
+                        ToSep(   *None   )
+
+             ChgVar     &Jul            %Sst( &JulD 3 3 )
+
+     /*---------------------------------------------------------------*/
+     /* Add new member to DLPScPfS File                               */
+     /*---------------------------------------------------------------*/
+
+             NewMbr:
+
+             ChgVar     &FlNum        ( &FlNum + 1 )
+             ChgVar     &FlNumA         &FlNum
+             ChgVar     &Member       ( 'TR'              *TCat       +
+                                        %Sst( &JulD 3 3 ) *TCat       +
+                                        &FlNumA                 )
+
+             AddPFM     File( DLPTRWKE )                              +
+                        Mbr(  &Member  )
+
+             MonMsg     CPF0000                                       +
+                        Exec(                                         +
+             Do               )
+
+               Goto     NewMbr
+
+             EndDo
+
+
+     /*---------------------------------------------------------------*/
+     /* Override Physical File Member                                 */
+     /*---------------------------------------------------------------*/
+
+             OvrDBF     File( DLPTRWKE )                              +
+                        Mbr(  &Member  )
+
+
+     /*---------------------------------------------------------------*/
+     /* Create Copy of file                                           */
+     /*---------------------------------------------------------------*/
+
+             Cpyf       Fromfile(DLpTrwk) Tofile(*Libl/DLpTrWke) +
+                          FromMbr(&User) ToMbr(&Member) +
+                          Mbropt(*Replace) Fmtopt(*Map)
+
+     /*---------------------------------------------------------------*/
+     /* Submit E-Mail Job                                             */
+     /*---------------------------------------------------------------*/
+
+             SbmJob     Cmd(                                          +
+                                                                      +
+             XXMail     ToAddr(     &EmailAddr                     )  +
+                        Subject(    'Transaction Details       '   )  +
+                        Message(    'FMT: ¦ +
+                                     A_Date/Time ¦ +
+                                     B_Tran ¦ +
+                                     C_Type ¦ +
+                                     D_Cat_no ¦ +
+                                     E_From_Area ¦ +
+                                     F_F_Zone ¦ +
+                                     G_F_Locn ¦ +
+                                     H_To_Area ¦ +
+                                     I_T_Zone ¦ +
+                                     J_T_Locn ¦ +
+                                     K_Comp_Area ¦ +
+                                     L_C_Zone ¦ +
+                                     M_C_Locn ¦ +
+                                     N_Qty ¦ +
+                                     O_Act_Qty ¦ +
+                                     P_Device ¦ +
+                                     Q_User ¦ +
+                                     R_Prog ¦ +
+                                     S_Date ¦ +
+                                     T_Time ¦ +
+                                     U_Process  ¦ +
+                                     V_Comp_Rq ¦ +
+                                     W_Pr_Req'                 )    +
+                        AttachType( *DbFile                      )    +
+                        ToStmF(     &Member                      )    +
+                        File(       &Member/*LibL/DLPTrwkE       ) )  +
+                                                                      +
+                        Job(        EMail_Tran                     )  +
+                        JobQ(       QBatch                         )
+
+     /*---------------------------------------------------------------*/
+     /* Remove Override                                               */
+     /*---------------------------------------------------------------*/
+
+             DltOvr     File( DLPTrwkE )
+
+
+End:
+
+EndPgm

@@ -1,0 +1,175 @@
+     h option( *nodebugio )
+
+      //-------------------------------------------------------------//
+      // Project:   ABC Data Extracts                                //
+      // Developer: Richard Humphries                                //
+      // Date:      3rd March 2006                                   //
+      //                                                             //
+      // Title:     ABC - Returns Quantity Scanned                   //
+      // Program:   ABRQRtn                                          //
+      //-------------------------------------------------------------//
+
+      //-------------------------------------------------------------//
+      //  File Specifications                                        //
+      //-------------------------------------------------------------//
+
+       // Returns Transaction File
+
+     fddLTran6  IF   E           K Disk
+
+       // Product File        File
+
+     fproduct   IF   E           K Disk
+
+       // Quantity of returns Scanned
+
+     faBPQRtnWf UF A E           K Disk
+
+      //-------------------------------------------------------------//
+      //  Definitions                                                //
+      //-------------------------------------------------------------//
+
+     d progSts        sds
+     d  qProg            *proc
+     d  qParms           *parms
+     d  qJob                 244    253
+     d  qUser                254    263
+
+     d p_DriverDesc    S             50
+     d p_StartDate     S               D
+     d p_EndDate       S               D
+     d startDteTim     S             13S 0
+     d startYear       S              4S 0
+     d startMonth      S              2S 0
+     d startDay        S              2S 0
+     d endDteTim       S             13S 0
+     d endYear         S              4S 0
+     d endMonth        S              2S 0
+     d endDay          S              2S 0
+
+      //-------------------------------------------------------------//
+      //  Mainline                                                   //
+      //-------------------------------------------------------------//
+
+     C     *entry        pList
+     C                   parm                    p_DriverDesc
+     C                   parm                    p_StartDate
+     C                   parm                    p_EndDate
+
+     C******             eval      endDteTim = %timeStamp( p_EndDate )
+     C******             addDur    23:*h         endDteTim
+     C******             addDur    59:*mn        endDteTim
+     C******             addDur    59:*s         endDteTim
+     C******             addDur    999999:*ms    endDteTim
+
+      /Free
+
+       startYear   = %subDt( p_StartDate: *years );
+       startMonth  = %subDt( p_StartDate: *months );
+       startDay    = %subDt( p_StartDate: *days );
+       startDteTim = ( (startYear - 1900) * 10000000000 ) +
+                        startMonth        * 100000000     +
+                        startDay          * 1000000;
+
+       endYear  = %subDt( p_EndDate: *years);
+       endMonth = %subDt( p_EndDate: *months);
+       endDay   = %subDt( p_EndDate: *days);
+       endDteTim = ( (endYear - 1900) * 10000000000 ) +
+                      endMonth        * 100000000     +
+                      endDay          * 1000000       +
+                      240000;
+
+       // Read through Returns Transaction File
+
+       setll startDteTim ddLTran6;
+
+       read ddLTran6;
+
+       dow not %eof ( ddLTran6 );
+
+          if r4DTmS > endDteTim;
+             leave;
+          endif;
+
+       // Only process 'Receipt' and 'FrozenRcpt' Transactions
+
+          if ( r4Tran = 'Receipt   ' and
+             ( r4Type = 'RC' or
+               r4Type = 'SR' or
+               r4Type = 'SO'         )   ) or
+             ( r4Tran = 'FrozenRcpt'     ) or
+             ( r4Tran = 'Destruct  '     ) or
+             ( r4ToLc = 'TRANIT      '   );
+
+             aBQRtnDvrD = p_DriverDesc;
+             aBQRtnStrD = p_StartDate;
+             aBQRtnEndD = p_EndDate;
+             aBQRtnSite = 'ROCKW';
+             aBQRtnCGrp = *blanks;
+             aBQRtnRng  = *blanks;
+             aBQRtnArea = R4ToAr;
+             aBQRtnDlSv = *blanks;
+             aBQRtnPuta = *blanks;
+             aBQRtnSrc  = *blanks;
+
+       // Retrieve the Product Format
+
+             chain ( r4CatN ) product;
+
+             if %found ( product );
+                aBQRtnFmt  = PrType + PrMed + PrFmt;
+             else;
+                aBQRtnFmt  = 'NULL';
+             endif;
+
+       // Determine Reason Code
+
+             if ( r4Tran = 'Receipt   ' and
+                ( r4Type = 'RC' or
+                  r4Type = 'SR' or
+                  r4Type = 'SO'         )   );
+                aBQRtnRsnC = 'SCAN';
+             endif;
+
+             if r4Tran = 'FrozenRcpt';
+                aBQRtnRsnC = 'FLDM';
+             endif;
+
+             if r4Tran = 'Destruct  ';
+                aBQRtnRsnC = 'DSTR';
+             endif;
+
+             if r4ToLc = 'TRANIT      ';
+                aBQRtnRsnC = 'SCAN';
+             endif;
+
+       // Update or Write a New Record
+
+             chain ( p_DriverDesc  :
+                     p_StartDate   :
+                     p_EndDate     :
+                     aBQRtnSite    :
+                     aBQRtnCGrp    :
+                     aBQRtnFmt     :
+                     aBQRtnRng     :
+                     aBQRtnArea    :
+                     aBQRtnRsnC    :
+                     aBQRtnDlSv      ) aBPQRtnWf;
+
+             if not %found ( aBPQRtnWf );
+                aBQRtnSQty = r4Qnty;
+                write aBRQRtnWf;
+             else;
+                aBQRtnSQty = aBQRtnSQty + r4Qnty;
+                update aBRQRtnWf;
+             endif;
+
+          endif;
+
+       read ddLTran6;
+
+       enddo;
+       *inLR = *On;
+       return;
+
+      /End-Free

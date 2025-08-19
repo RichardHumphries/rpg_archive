@@ -1,0 +1,71 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   Distibuted Labels                                  */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Entertainment UK Ltd.                              */
+     /* Date:      12th October 2007                                  */
+     /*                                                               */
+     /* Title:     Run upload of Location / Product Cross Reference   */
+     /*            file.                                              */
+     /* Program:   DLC240CL                                           */
+     /* Scan:                                                         */
+     /*---------------------------------------------------------------*/
+
+Pgm                     Parm( &Area &KeepLinks)
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &Area       *Char   Len(   2   )
+             Dcl        &Keeplinks  *Char   Len(   1   )
+             Dcl        &User       *Char   Len(  10   )
+             Dcl        &MsgTxt     *Char   Len( 120   )              +
+                                                                      +
+                        Value('File DLplcpr is in use - cannot update +
+                               records, please try later')
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve Job Name                                             */
+     /*---------------------------------------------------------------*/
+
+             RtvJobA    User( &User )
+
+     /*---------------------------------------------------------------*/
+     /* Get exclusive lock on file while we update records            */
+     /*---------------------------------------------------------------*/
+             Alcobj     obj((DLplcpr *File *Excl)) Wait(20)
+
+     /* If lock cannot be achieved - print a list of users locking    *     +
+      *                            - the file, send msg to the user   *     +
+      *                            - and end the program              */
+             MonMsg     ( Cpf1002 )  Exec(Do)
+
+             Wrkobjlck  DLplcpr *File  Mbr(*All) +
+                          Output(*Print)
+
+             SndMsg     Msg(    &MsgTxt  )                            +
+                        ToUsr(  &User    )
+
+             Goto   End
+
+             Enddo
+     /*---------------------------------------------------------------*/
+     /* Call Selection Screen                                         */
+     /*---------------------------------------------------------------*/
+
+             Call       DLr240  (&Area &Keeplinks)
+
+     /*---------------------------------------------------------------*/
+     /* Reorganise file after updates                                 */
+     /*---------------------------------------------------------------*/
+
+             Rgzpfm     DLplcpr
+             Monmsg     ( Cpf0000 )
+
+     /*---------------------------------------------------------------*/
+     /* Remove exclusive lock on file after we update records         */
+     /*---------------------------------------------------------------*/
+
+             Dlcobj     obj((Rtplcpr *File *Excl))
+End:
+EndPgm

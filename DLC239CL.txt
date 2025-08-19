@@ -1,0 +1,69 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   Distibuted Labels                                  */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Entertainment UK Ltd.                              */
+     /* Date:      12th October 2007                                  */
+     /*                                                               */
+     /* Title:     Load Location/Product XRef - Call Selection Screen */
+     /*            Controlling CLP                                    */
+     /* Program:   DLC239CL                                           */
+     /* Scan:                                                         */
+     /*---------------------------------------------------------------*/
+
+Pgm
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &Area       *Char   Len(  2   )
+             Dcl        &KeepLinks  *Char   Len(  1   )
+             Dcl        &F3Pressed  *Char   Len(  1   ) Value('N')
+             Dcl        &Jobname    *Char   Len( 10   ) Value('LcPr_     ')
+             Dcl        &User       *Char   Len( 10   )
+
+     /*---------------------------------------------------------------*/
+     /* Get User                                                      */
+     /*---------------------------------------------------------------*/
+             RtvjobA    User(&User)
+
+     /*---------------------------------------------------------------*/
+     /* Call Selection Screen                                         */
+     /*---------------------------------------------------------------*/
+
+             Call       DLr239  (&Area &KeepLinks &F3Pressed)
+
+     /*---------------------------------------------------------------*/
+     /* If F3/F12 is pressed then end otherwise submit job            */
+     /*---------------------------------------------------------------*/
+
+             If         (&F3Pressed = 'Y') Then(Do)
+             SndMsg  Msg('Product/Location X/Ref Load aborted +
+                          with F3/F12') ToUsr(&User)
+             Goto       End
+             EndDo
+
+     /*-----------------------------------------*/
+     /* Change Jobname to include area selected */
+     /*-----------------------------------------*/
+
+             If         (&Area *Ne '##') Then(Do)
+             If         (&Area = *Blanks) Then(ChgVar &Jobname +
+                          Value('LcPr_All'))
+
+             If         (&Area *Ne *Blanks)     +
+                               (ChgVar (%Sst(&Jobname 6 2)) +
+                                Value(&Area))
+
+             Sbmjob     +
+                        Cmd(Call Pgm(DLC240CL)      +
+                           Parm(&Area &Keeplinks))  +
+                           Job(&JobName)            +
+                           Jobq(*LIBL/QBatch)
+
+             SndMsg     Msg('Product/Location X/Ref Load +
+                          submitted to batch') ToUsr(&User)
+                          Enddo
+End:
+
+EndPgm

@@ -1,0 +1,190 @@
+     h option( *nodebugio )
+
+      //-------------------------------------------------------------//
+      // Project:   ABC Data Extracts                                //
+      // Developer: Richard Humphries                                //
+      // Date:      20th April 2006                                  //
+      //                                                             //
+      // Title:     ABC - Build Assets & Depreciation - Core&Direct  //
+      // Program:   ABRAsset                                         //
+      //-------------------------------------------------------------//
+
+      //-------------------------------------------------------------//
+      //  File Specifications                                        //
+      //-------------------------------------------------------------//
+
+       // Period End Dates File - DDM over InPerDat
+
+     finPerDat  IF   E           K Disk
+
+       // Period Costs File - DDM over ISCost
+
+     fddCost    IF   E           K Disk
+
+       // Period Asset Costs File - DDM over ISPAsCJc
+
+     fddPAsCJc  IF   E           K Disk
+
+       // Period Asset Costs File - DDM over ISPAsCJd
+
+     fddPAsCJd  IF   E           K Disk
+
+       // Analysis Code File - DDM over FMISGC
+
+     fddISGC    IF   E           K Disk
+
+       // Asset & Depreciation Work File
+
+     faBPAssetWfO    E           K Disk
+
+      //-------------------------------------------------------------//
+      //  Definitions                                                //
+      //-------------------------------------------------------------//
+
+     d progSts        sds
+     d  qProg            *proc
+     d  qParms           *parms
+     d  qJob                 244    253
+     d  qUser                254    263
+
+     d p_DriverDesc    S             50
+     d p_StartDate     S               D
+     d p_EndDate       S               D
+     d p_CoreDirect    S             10
+     d w_EndDate       S               D
+     d endDate         S              7S 0
+     d endYear         S              4S 0
+     d endMonth        S              2S 0
+     d endDay          S              2S 0
+
+     d k_coNo86        S                   like( coNo86 )
+     d k_pPrT86        S                   like( pPrT86 )
+     d k_i7Depp        S                   like( i7Depp )
+     d k_i7Perd        S                   like( i7Perd )
+
+      //-------------------------------------------------------------//
+      //  Mainline                                                   //
+      //-------------------------------------------------------------//
+
+     C     *entry        pList
+     C                   parm                    p_DriverDesc
+     C                   parm                    p_StartDate
+     C                   parm                    p_EndDate
+     C                   parm                    p_CoreDirect
+
+      /Free
+
+       w_EndDate  = p_EndDate - %days( 1 );
+
+       endYear  = %subDt( w_EndDate: *years);
+       endMonth = %subDt( w_EndDate: *months);
+       endDay   = %subDt( w_EndDate: *days);
+       endDate  = ( (endYear - 1900) * 10000 +
+                     endMonth        * 100   +
+                     endDay                    );
+
+       // Retrieve Period
+
+       k_coNo86 = '01';
+       k_pPrT86 = '2';
+
+       chain ( k_coNo86  :
+               k_pPrT86  :
+               endDate     ) inPerDat;
+
+       if %found( inPerDat );
+
+       // Read through Returns Transaction File
+
+          k_i7Depp = '1';
+          k_i7Perd =  %char( ( (2000 + pPrY86) * 100 ) + pPrd86 );
+
+          setll ( k_i7Depp :
+                  k_i7Perd   ) ddCost;
+
+          readE ( k_i7Depp :
+                  k_i7Perd   ) ddCost;
+
+          dow not %eof ( ddCost );
+
+             aBAsetDvrD = p_DriverDesc;
+             aBAsetStrD = p_StartDate;
+             aBAsetEndD = p_EndDate;
+             aBAsetComp = p_CoreDirect;
+             aBAsetPerd = i7Perd;
+             aBAsetLocn = i7GC03;
+             aBAsetAsCd = i7Code;
+             aBAsetAsTp = i7GC01;
+             aBAsetCpDt = i7Dat2;
+             aBAsetPrCd = i7GC04;
+             aBAsetGBV  = i7GBV;
+             aBAsetWDV  = i7WDV;
+             aBAsetDPT  = i7DPT;
+             aBAsetDYT  = i7DYT;
+
+             if p_CoreDirect = 'EUK_Direct';
+                aBAsetLocn = i7GC01;
+                aBAsetAsTp = i7GC04;
+                aBAsetPrCd = i7GC02;
+             endif;
+
+       // Retrieve Asset Descriptions
+
+             if p_CoreDirect = 'EUK_Core  ';
+                chain ( i7Depp :
+                        i7Perd :
+                        i7GC03 :
+                        i7Code :
+                        i7SubC :
+                        i7Tran   ) ddPAsCJc;
+             else;
+                chain ( i7Depp :
+                        i7Perd :
+                        i7GC04 :
+                        i7Code :
+                        i7SubC :
+                        i7Tran   ) ddPAsCJd;
+             endif;
+
+             if %found ( ddPAsCJc ) or
+                %found ( ddPAsCJd );
+                aBAsetSDsc = i1SDes;
+                aBAsetFDsc = i1Ds01;
+             else;
+                aBAsetSDsc = *blanks;
+                aBAsetFDsc = *blanks;
+                aBAsetSDsc = 'NULL';
+                aBAsetFDsc = 'NULL';
+             endif;
+
+       // Retrieve Project Description
+
+             f2GN   = '4';
+
+             if p_CoreDirect = 'EUK_Core  ';
+                chain ( f2GN   :
+                        i7GC04   ) ddISGC;
+             else;
+                chain ( f2GN   :
+                        i7GC02   ) ddISGC;
+             endif;
+
+             if %found ( ddISGC );
+                aBAsetPrDs = f2Desc;
+             else;
+                aBAsetPrDs = *blanks;
+                aBAsetPrDs = 'NULL';
+             endif;
+
+             write aBRAssetWf;
+
+             readE ( k_i7Depp :
+                     k_i7Perd   ) ddCost;
+
+          enddo;
+       endif;
+
+       *inLR = *On;
+       return;
+
+      /End-Free

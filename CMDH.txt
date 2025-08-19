@@ -1,0 +1,17 @@
+      /If Not Defined( CmdHCopied )
+      /Define          CmdHCopied
+      /Else
+      /Eof
+      /EndIf
+
+      *=====================================================================
+      * Command Header
+      *
+      * Copyright (C) Julian Monypenny 1997
+      *=====================================================================
+      /Copy EukCopySrc/QRPGLESRC,stdTypH
+
+      *---------------------------------------------------------------------
+     D ExecCmd         Pr                  Like( LglTyp )
+      *---------------------------------------------------------------------
+     D  Cmd                                Like( CmdTyp )  Value
