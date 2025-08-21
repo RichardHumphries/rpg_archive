@@ -1,0 +1,76 @@
+      *---------------------------------------------------------------*
+      * Project:   Supplier Returns Lotus Notes Interface             *
+      * Developer: Richard Humphries                                  *
+      * Company:   S.S.S. Ltd.                                        *
+      * Date:      13th November 2001                                 *
+      *                                                               *
+      * Title:     Trigger Program to Submit LNR045                   *
+      * Program:   LNR046                                             *
+      * Scan:                                                         *
+      *                                                               *
+      * Modified:  18/1/2002                                          *
+      * by:        Richard Humphries                                  *
+      * Reason:    Change JobQ to be All_Scheds instead of QBatch2    *
+      * Scan:      a1                                                 *
+      *                                                               *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+      * Program status data structure.
+
+     D                SDs
+     DProgName           *Proc
+     DNbr_Parms          *Parms
+     DRecMod                 254    263
+
+     DLNPSRICFlds    E Ds                  ExtName( LNPSRIC )
+     D                                     Based( LNPSRICPtr )
+
+     D CmdStr          S            256
+     D CmdLen          S             15P 5 Inz( 256 )
+
+      * Commonly used trigger functions
+
+      /COPY eukcopysrc/qrpglesrc,xxrtrgd
+      /COPY eukcopysrc/qrpglesrc,xxrstdt
+      /COPY eukcopysrc/qrpglesrc,xxrtrge
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+     C                   Eval      LNPSRICPtr = DbAftPtr
+
+  b1 C                   If        ICFile     = 'LNPSRIH   ' And
+     C                             ICFlag     = 'N UPLOAD  '
+
+      * Submit LNR045 to process Lotus Notes Interface File
+
+     C                   Eval      CmdStr = 'SbmJob Cmd('     +
+     C                                      'Call '           +
+     C                                      'PGM/LNC046CL '   +
+     C                                      ') '              +
+     C                                      'Job('            +
+     C                                      'NI_Upload'       +
+     C                                      ') '              +
+     C                                      'JobQ('           +
+a1   C                                      'GPL1/All_Scheds)'
+
+     C                   Call      'QCMDEXC'
+     C                   Parm                    CmdStr
+     C                   Parm                    CmdLen
+
+  e1 C                   EndIf
+
+     C                   Eval      *InLr = *On
+     C                   Return
+
+      *==============================================================*
+      * Dummy routine                                                *
+      *==============================================================*
+
+     C     BufAryErr     BegSr
+     C                   EndSr

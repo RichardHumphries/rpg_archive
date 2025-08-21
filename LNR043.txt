@@ -1,0 +1,110 @@
+      *---------------------------------------------------------------*
+      * Project:   Supplier Returns Lotus Notes Interface             *
+      * Developer: Richard Humphries                                  *
+      * Company:   S.S.S. Ltd.                                        *
+      * Date:      18th October 2001                                  *
+      *                                                               *
+      * Title:     Trigger Program to Submit LNR042                   *
+      * Program:   LNR043                                             *
+      *                                                               *
+      * Scan:      A1                                                 *
+      * Changed    19 May 2004                                        *
+      * by         Darren Yull                                        *
+      * Reason     Change jobq                                        *
+      *                                                               *
+      * Scan:      A2                                                 *
+      * Changed    28 February 2006                                   *
+      * by         Lyndon Hill                                        *
+      * Reason     Check whether return sent to Batch                 *
+      *---------------------------------------------------------------*
+
+A2  €FSrpBchHdr IF   E           K Disk
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+      * Program status data structure.
+
+     D                SDs
+     DProgName           *Proc
+     DNbr_Parms          *Parms
+     DRecMod                 254    263
+
+     DSRPTrkDIFlds   E Ds                  ExtName( SRPTrkDI )
+     D                                     Based( SRPTrkDIPtr )
+
+     D PRFNChar        S              8
+     D JobName         S             10
+     D Submit          S              1
+     D CmdStr          S            256
+     D CmdLen          S             15P 5 Inz( 256 )
+
+A2   D CoNumber        S              2A   Inz('01')
+
+      * Commonly used trigger functions
+
+      /COPY eukcopysrc/qrpglesrc,xxrtrgd
+      /COPY eukcopysrc/qrpglesrc,xxrstdt
+      /COPY eukcopysrc/qrpglesrc,xxrtrge
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+     C                   Eval      SRPTrkDIPtr = DbAftPtr
+
+     C                   Move      TIPRFN        PRFNChar
+
+A2    * Only interface non-Batch returns via notes.
+A2   C     BhKey         Klist
+A2   C                   Kfld                    CoNumber
+A2   C                   Kfld                    TIPRFN
+A2   C     BhKey         Chain     SrpBchHdr
+A2   C                   If        %Found(SrpBchHdr) And
+A2   C                             BhSts = 'F'
+
+      * Check File 'JobName' in WorkFiles to see if we need to Submit Job
+
+     C                   Eval      JobName     = 'NI'     +
+     C                                           PRFNChar
+
+     C                   Call      'LNC041CL'
+     C                   Parm                    JobName
+     C                   Parm                    Submit
+
+  b1 C                   If        Submit      = 'Y'
+
+      * Submit LNR042 to populate Lotus Notes Interface Files
+
+     C                   Eval      CmdStr = 'SbmJob Cmd('  +
+     C                                      'Call '        +
+     C                                      'LNR042 '      +
+     C                                      'Parm('''      +
+     C                                       PRFNChar      +
+     C                                      ''')) '        +
+     C                                      'Job('         +
+     C                                      'NI'           +
+     C                                       PRFNChar      +
+     C                                      ') '           +
+     C                                      'JobQ('        +
+A1   C                                      'GPL1/QBatch2) '+
+     C                                      'MsgQ('        +
+     C                                      'E_NOTES)'
+
+     C                   Call      'QCMDEXC'
+     C                   Parm                    CmdStr
+     C                   Parm                    CmdLen
+
+  e1 C                   EndIf
+A2   C                   EndIf
+
+     C                   Eval      *InLr = *On
+     C                   Return
+
+      *==============================================================*
+      * Dummy routine                                                *
+      *==============================================================*
+
+     C     BufAryErr     BegSr
+     C                   EndSr

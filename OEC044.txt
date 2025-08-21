@@ -1,0 +1,297 @@
+/* ------------------------------------------------------------------*/
+/* Project:   FTP File Transmission Processing                       */
+/* Developer: Sanjay                                                 */
+/* Date:      13th January 2003                                      */
+/* Title:     Create FTP File Transmission Member - Blyth PL         */
+/* a1         5/1/2005      Richard Humphries                        */
+/* Call OEC041CCL instead of OEC041CL                                */
+/* A2         6/5/2005      Phil Katz                                */
+/* Remove Reorg. Reorgs are now automated.                           */
+/*-------------------------------------------------------------------*/
+
+Pgm                     Parm( &CrCar# )
+
+/* ------------------------------------------------------------------*/
+/* Declare Variables                                                 */
+/* ------------------------------------------------------------------*/
+             Dcl        &BackupLib  *Char   Len(  10   )  Value(BackupLib)
+             Dcl        &Code       *Char   Len(   4   )
+             Dcl        &CodeA      *Char   Len(   3   )
+             Dcl        &Date       *Char   Len(   6   )
+             Dcl        &FailPass   *Char   Len(   1   )
+             Dcl        &File       *Char   Len(  10   )  Value(OspEPLH)
+             Dcl        &FlNum      *Dec    Len(   3 0 )  Value(0)
+             Dcl        &Seq        *Dec    Len(   3 0 )  Value(0)
+             Dcl        &SeqA       *Char   Len(   3   )
+             Dcl        &FlNumA     *Char   Len(   3   )
+             Dcl        &HHMM       *Char   Len(   4   )
+             Dcl        &Job        *Char   Len(  10   )
+             Dcl        &JobProg    *Char   Len(  23   )
+             Dcl        &Jul        *Char   Len(   3   )
+             Dcl        &JulD       *Char   Len(   6   )
+             Dcl        &Member     *Char   Len(  10   )
+             Dcl        &Msg        *Char   Len( 512   )
+             Dcl        &Prog       *Char   Len(  10   )
+             Dcl        &Sender     *Char   Len(  80   )  Value('dummy message +
+                                                               to retrieve +
+                                                               program name')
+             Dcl        &SysName    *Char   Len(   8   )
+             Dcl        &Text       *Char   Len(  50   )
+             Dcl        &Time       *Char   Len(   6   )
+             Dcl        &ToFile     *Char   Len(  30   )
+             Dcl        &User       *Char   Len(  10   )
+             Dcl        &Wait       *Dec    Len(   5 0 )  Value(120)
+
+             DclF       RTPCAR
+/* send dummy message to get program name                            */
+
+             SndPgmMsg  MsgId(  Cpf0001  )                            +
+                        MsgF(   QCpfMsg  )                            +
+                        ToPgmQ( *Same    )
+
+        /* dummy message */
+
+             RcvMsg     PgmQ(   *Same    )                            +
+                        Sender( &Sender  )
+
+             ChgVar     &Prog             %Sst(&Sender 56 10)
+
+/* set up identifying start of message info                          */
+
+             RtvJobA  ( &Job           )   User( &User )
+
+             ChgVar   ( &JobProg       )       ( &Job  )
+
+             If       ( &Job *Ne &Prog )
+
+             Do
+             ChgVar   ( &JobProg       )                              +
+                      ( &Job *BCat '(' *TCat                          +
+                        &Prog *TCat ')')
+             EndDo
+
+/* if on test system (three) and user starts J_ use test BACK UP LIB */
+
+             RtvNetA    SysName( &SysName )
+
+             If        ( &SysName *Eq 'THREE'  *And                   +
+                        %Sst(&User 1 2) *Eq 'J_' )                    +
+                                                                      +
+             Do
+             ChgVar    ( &BackupLib  ) ( AccBack )
+             EndDo
+
+/* get file description */
+
+             RtvObjD  Obj(     &File )                                +
+                      ObjType( *File )                                +
+                      Text(    &Text )
+
+             MonMsg   ( Cpf0000 )
+
+     /*---------------------------------------------------------------*/
+     /* Get current date and time                                     */
+     /*---------------------------------------------------------------*/
+
+             RtvSysVal  SysVal( QTime  )                              +
+                        RtnVar( &Time  )
+
+             RtvSysVal  SysVal( QDate  )                              +
+                        RtnVar( &Date  )
+
+             CvtDat     Date(   &Date  )                              +
+                        ToVar(  &JulD  )                              +
+                        FromFmt(*SysVal)                              +
+                        ToFmt(  *Jul   )                              +
+                        ToSep(  *None  )
+
+             ChgVar     (&Jul)          (%Sst(&JulD 3 3))
+
+             ChgVar     (&HHMM)         (%Sst(&Time 1 4))
+
+     /*---------------------------------------------------------------*/
+     /* Lock EDI header workfile                                      */
+     /*---------------------------------------------------------------*/
+             AlcObj:
+
+             AlcObj     ((&File *File *ExcL))                         +
+                        Wait(&Wait)
+
+             MonMsg      Cpf0000                                      +
+                         ExeC(Do)
+
+             ChgVar     ( &Msg  )                                     +
+                        (&JobProg *BCat '- waiting to                 +
+                          use' *BCat &File *BCat '("' *TCat &Text     +
+                          *TCat '") - if there''s a problem then      +
+                          WrkOBJLCK' *BCat &File *BCat '*File will    +
+                          show you what''s locking the file ***')
+
+             SndMsg     Msg(    &Msg   )                              +
+                        ToMsgQ( QsysOpr)
+
+             ChgVar     (&Wait)         (&Wait + 120)
+
+             Goto       AlcObj
+
+             EndDo
+
+/* if had to wait tell operator that we're ok now */
+
+             If         (&Wait *Gt 120) Then(Do)
+             ChgVar     (&Msg)                                        +
+                        (&JobProg *BCat '- now +
+                          continuing ok as' *BCat &File *BCat 'file   +
+                          has become available.  This message is      +
+                          for information only and no operator        +
+                          action is required.')
+
+             SndMsg     Msg(    &Msg    )                             +
+                        ToMsgQ( QsysOpr )
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve File Details                                         */
+     /*---------------------------------------------------------------*/
+
+             Call         OerPLF20D  ( &CrCar#                        +
+                                       &CrPDef                        +
+                                       &CrEukC )
+
+             RtvDtaAra   ( Oea20Dig )     ( &Seq )
+
+             If          ( &Seq *Eq 998 )                             +
+             Then(ChgVar ( &Seq )  (1))
+
+             Else                                                     +
+             ChgVar (  &Seq ) ( &Seq + 1 )
+
+             ChgDtaAra   ( Oea20Dig )     ( &Seq )
+             ChgVar ( &SeqA ) ( &Seq  )
+     /*---------------------------------------------------------------*/
+     /* Stop if File Name is Blank                                    */
+     /*---------------------------------------------------------------*/
+
+             If         (&CrPDef = '          ')                      +
+                        Then(Goto End )
+
+     /*---------------------------------------------------------------*/
+     /* Populate EDI Work File                                        */
+     /*---------------------------------------------------------------*/
+
+     /*---------------------------------------------------------------*/
+     /* Add new member to EDI workfile                                */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     ( &Code   ) ( &CrEukC    )
+             ChgVar     ( &CodeA  ) ( &CrEukC    )
+
+             NewMbr:
+
+             ChgVar     ( &FlNum  ) ( &FlNum + 1 )
+
+             ChgVar     ( &FlNumA ) ( &FlNum     )
+
+             ChgVar     ( &Member ) ('D' *TCat &CodeA  *TCat          +
+                                     &SeqA *TCat &FlNumA)
+
+             AddPFM     ( &CrPDef )                                   +
+                        ( &Member )
+
+             MonMsg       Cpf0000                                     +
+                    ExeC( Goto NewMbr)
+
+     /*---------------------------------------------------------------*/
+     /* Copy data to new member                                       */
+     /*---------------------------------------------------------------*/
+
+             CpyF       FromFile( &File    )                          +
+                        ToFile(   &CrpDef  )                          +
+                        ToMbr(    &Member  )                          +
+                        MbrOpt(   *Replace )                          +
+                        FmtOpt(   *NoChk   )
+
+             CpyF       FromFile( OspEPLD  )                          +
+                        ToFile(   &CrpDef  )                          +
+                        ToMbr(    &Member  )                          +
+                        MbrOpt(   *Add     )                          +
+                        FmtOpt(   *NoChk   )
+
+             CpyF       FromFile( OspEPLT  )                          +
+                        ToFile(   &CRPDEF  )                          +
+                        ToMbr(    &Member  )                          +
+                        MbrOpt(   *Add     )                          +
+                        FmtOpt(   *NoChk   )
+
+     /*---------------------------------------------------------------*/
+     /* Create rolling backup copy of above three files               */
+     /*---------------------------------------------------------------*/
+
+             CpyF       FromFile( &File               )               +
+                        ToFile(   &BackupLib/OspEPLHBu)               +
+                        MbrOpt(   *Replace            )               +
+                        FromRcd(  1                   )
+
+             MonMsg     Cpf2817
+
+             CpyF       FromFile( OspEPLD             )               +
+                        ToFile(   &BackupLib/OspEPLDBU)               +
+                        MbrOpt(   *Replace            )               +
+                        FromRcd(  1                   )
+
+             MonMsg     Cpf2817
+
+             CpyF       FromFile( OSPEPLT             )               +
+                        ToFile(   &BackupLib/OspEPLTBU)               +
+                        MbrOpt(   *Replace            )               +
+                        FromRcd(  1                   )
+
+             MonMsg     Cpf2817
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve New File Name for Transmission                       */
+     /*---------------------------------------------------------------*/
+             ChgVar     ( &Tofile ) ('D' *TCat &Code *TCat            +
+                                     &SeqA *TCat '.' *TCat &Jul)
+
+     /*---------------------------------------------------------------*/
+     /* Send File using FTP                                           */
+     /*---------------------------------------------------------------*/
+
+             Call       Oec041CCl    ( &CrpDef                        +
+                                       &Member                        +
+                                       &ToFile                        +
+                                       &FailPass                      +
+                                       'B')
+
+             RclRsc
+
+     /*---------------------------------------------------------------*/
+     /* Reorganise manifested boxes file                              */
+     /*---------------------------------------------------------------*/
+
+/* A2 ****** RgzPfm     OepBoxM ************************************ */
+
+/* A2 ****** MonMsg     CPF0000 ************************************ */
+
+     /*---------------------------------------------------------------*/
+     /* Clear work files                                              */
+     /*---------------------------------------------------------------*/
+
+             ClrPFM     &File
+
+             ClrPFM     OspEPLD
+
+             ClrPFM     OspEPLT
+
+     /*---------------------------------------------------------------*/
+     /* Unlock EDI header workfile                                    */
+     /*---------------------------------------------------------------*/
+
+             DlcObj     ((&File *File *ExCL))
+
+             MonMsg     Cpf0000
+
+             End:
+
+             EndPgm

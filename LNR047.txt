@@ -1,0 +1,51 @@
+      *---------------------------------------------------------------*
+      * Project:   Supplier Returns Lotus Notes Interface             *
+      * Developer: Richard Humphries                                  *
+      * Company:   S.S.S. Ltd.                                        *
+      * Date:      16th November 2001                                 *
+      *                                                               *
+      * Title:     Count Number of Lines in a PRF                     *
+      * Program:   LNR047                                             *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D P1PRFN          S              8P 0
+     D P1Count         S              7P 0
+
+      *---------------------------------------------------------------*
+      *  Count Number of Lines in a PRF                               *
+      *---------------------------------------------------------------*
+
+     C/Exec Sql
+     C+
+     C+         Select   Count( TIItem )
+     C+
+     C+         Into    :P1Count
+     C+
+     C+         From     SRLTrkI1
+     C+
+     C+         Where    TICoNo = '01'    And
+     C+                  TIPRFN = :P1PRFN
+     C+
+     C/End-Exec
+
+     C                   Eval      *InLR = *On
+     C                   Return
+
+      *========================*
+      * *InzSr                 *
+      *========================*
+
+     C     *InzSR        BegSr
+
+      * Entry Parameters
+
+     C     *Entry        PList
+     C                   Parm                    P1PRFN
+     C                   Parm                    P1Count
+
+     C                   EndSr

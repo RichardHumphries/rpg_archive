@@ -1,0 +1,273 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   FTP File Transmission Processing for FlowBoth      */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Entertainment U.K. Ltd.                            */
+     /* Date:      13th August 2004                                   */
+     /*                                                               */
+     /* Title:     Receive FTP Files from FlowBoth                    */
+     /* Program:   OECFB2                                             */
+     /* Scan:                                                         */
+     /*                                                               */
+     /*---------------------------------------------------------------*/
+
+             Pgm
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &File       *Char   Len(  10   ) Value('OELBOX')
+             Dcl        &Pgm        *Char   Len(   6   )
+             Dcl        &Job        *Char   Len(  10   )
+             Dcl        &JobProg    *Char   Len(  23   )
+             Dcl        &Msg        *Char   Len( 256   )
+             Dcl        &System     *Char   Len(  32   )
+             Dcl        &Sender     *Char   Len(  80   ) Value('dummy +
+                          message to retrieve program name')
+             Dcl        &SEX        *Dec    Len(   5 0 ) Value( 60 )
+             Dcl        &SlidA      *Char   Len(   3   )
+             Dcl        &NoRecs     *Dec    Len(  10 0 )
+             Dcl        &Document   *Char   Len(  32   )
+
+             DclF       OELFBLog
+
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve FlowBoth Files via FTP - a1                          */
+     /*---------------------------------------------------------------*/
+
+             Call       OEC044CCL
+
+     /*---------------------------------------------------------------*/
+     /* Send dummy message to get Program Name                        */
+     /*---------------------------------------------------------------*/
+
+             RtvJobA    Job( &Job )
+
+     /*---------------------------------------------------------------*/
+     /*  To Receive the program name                                  */
+     /*---------------------------------------------------------------*/
+
+             SndPgmMsg  MsgId(  CPF0001 )                             +
+                        MsgF(   QCPFMsg )                             +
+                        ToPgmQ( *Same   )
+
+             RcvMsg     PgmQ(   *Same   )                             +
+                        Sender( &Sender )
+
+             ChgVar     Var(    &JobProg )                            +
+                        Value(  &Job                    *BCat         +
+                                '('                     *TCat         +
+                                ( %SSt(&Sender 56 10) ) *TCat         +
+                                ')'                           )
+
+     /*---------------------------------------------------------------*/
+     /* Create the folders so that no manual intervention is          */
+     /* required on the Live machine                                  */
+     /*---------------------------------------------------------------*/
+
+             AlcObj     Obj( ( OEPFBLog                               +
+                               *File                                  +
+                               *Excl    ) )
+
+             CrtFlr     Flr(  FBEDIIM                          )      +
+                        Text( 'FlowBoth EDI Transmission File' )      +
+                        Aut(  *All                             )
+
+             MonMsg     CPF0000
+
+             CrtFlr     Flr(  FBEDIIMA                         )      +
+                        Text( 'FlowBoth EDI Archive File     ' )      +
+                        Aut(  *All                             )
+
+             MonMsg     CPF0000
+
+             ClrPFM     OEPFBLog
+
+             QryDocLib  Flr(       FBEDIIM  )                         +
+                        OutFile(   OEPFBLog )                         +
+                        OutMbr(    OEPFBLog                           +
+                                   *Replace )                         +
+                        OutDtaTyp( *CrtDate )
+
+     /*---------------------------------------------------------------*/
+     /* Delete FlowBoth Files via FTP - a1                            */
+     /*---------------------------------------------------------------*/
+
+             Call       OEC048CCL
+
+     /*---------------------------------------------------------------*/
+     /* Check Number of Records to see if any files were Retrieved -A4*/
+     /*---------------------------------------------------------------*/
+
+             RtvMbrD    File(      OEPFBLog )                         +
+                        NbrCurRcd( &NoRecs  )
+
+             If       ( &NoRecs = 0 )                                 +
+                                                                      +
+             Do
+
+             SndMsg     Msg('Job OECFB2 - NO Data Files were picked +
+                          up from FlowBoth - Please Try Later.')      +
+                                                                      +
+                        ToMsgQ( QSysOpr )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Read document names in Create Date Sequence                   */
+     /*---------------------------------------------------------------*/
+
+             ReadDocId:
+
+             RcvF
+
+             MonMsg     CPF0000                                       +
+                        Exec(                                         +
+             Do               )
+             GoTo       EndJob
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Copy from PC Document to Input File for recording box history */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     Var(   &Document            )                 +
+                        Value( 'QDLS/FBEDIIM/' *Cat                   +
+                               &QDLDNm              )
+
+             CpyFrmImpF FromStmF( &Document )                         +
+                        ToFile(   OEPEDIL2  )                         +
+                        MbrOpt(   *Add      )                         +
+                        RcdDlm(   *LF       )
+
+             MonMsg     CPF0000                                       +
+                        Exec(                                         +
+             Do               )
+
+             ChgVar     Var(   &Msg   )             +
+                        Value( &JOBPROG *BCAT 'is unable to +
+                          copy' *BCAT &QDLDNm *BCAT 'from folder +
+                          FBEDIIM to file OEPEDIL2. This message is +
+                          for historical information purposes and +
+                          NO operator action is required.')
+
+             SndMsg     Msg(    &Msg    )                             +
+                        ToMsgQ( QSysOpr )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Copy file OEPEDIL2 to Historylib                              */
+     /*---------------------------------------------------------------*/
+
+             CpyF       FromFile( OEPEDIL2  )                         +
+                        ToFile(   OEPEDIL2H )                         +
+                        MbrOpt(   *Add      )                         +
+                        FromRcd(  1         )                         +
+                        FmtOpt(   *Map                                +
+                                  *Drop     )
+
+             MonMsg     CPF0000
+
+             DltDLO     DLO( &QDLDNm  )                               +
+                        Flr( FBEDIIMA )
+
+             MonMsg     ( CPF8A16                                     +
+                          CPF0000 )
+
+     /*---------------------------------------------------------------*/
+     /* Move document to Archive Folder after copy to database        */
+     /*---------------------------------------------------------------*/
+
+             MovDoc     FromDoc( &QDLDNm  )                           +
+                        FromFlr( FBEDIIM  )                           +
+                        ToFlr(   FBEDIIMA )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve SLID                                                 */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     Var(     &SLIDA              )                +
+                        Value(   %SSt( &QDLDNm 2 3 ) )
+
+     /*---------------------------------------------------------------*/
+     /* Call program to tell us which program to use to process the   */
+     /* incoming log                                                  */
+     /*---------------------------------------------------------------*/
+
+             Call       Pgm(  OERPLS )                                +
+                        Parm( &SLIDA                                  +
+                              &Pgm   )
+
+     /*---------------------------------------------------------------*/
+     /* Wait if OELBox is not available                               */
+     /*---------------------------------------------------------------*/
+
+             AlcOELBox:
+
+             AlcObj     Obj( ( OELBox                                 +
+                               *File                                  +
+                               *ShrUpd ) )                            +
+                        Wait(  &SEX      )
+
+             MonMsg     CPF0000                                       +
+                        Exec(                                         +
+             Do               )
+
+             ChgVar     Var(   &SEX   )                               +
+                        Value( &SEX +                                 +
+                               &SEX   )
+
+             ChgVar     Var(   &Msg   )             +
+                        Value( &JOBPROG *BCAT 'is unable to +
+                          use file' *BCAT &FILE *BCAT 'at present!  +
+                          If this message recurs type WRKOBJLCK' +
+                          *BCAT &FILE *BCAT '*FILE on a command +
+                          line to see what''s locking it.  You may +
+                          just have to wait for a backup to finish.')
+
+             SndMsg     Msg(    &Msg    )                             +
+                        ToMsgQ( QSysOpr )
+
+             GoTo       AlcOELBox
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Process incoming logs for Integrated Despatch and Proof of    */
+     /* Collection Systems                                            */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Pgm ¬= ' ' )                                 +
+                                                                      +
+             Do
+             Call       &Pgm
+             EndDo
+
+             DlcObj     Obj( ( OELBox                                 +
+                               *File                                  +
+                               *ShrUpd ) )
+
+     /*---------------------------------------------------------------*/
+     /* Clear deleted records processed by &Pgm                       */
+     /*---------------------------------------------------------------*/
+
+             RgzPFM     OEPEDIL2
+             MonMsg     CPF0000
+
+             Goto       ReadDocId
+
+             EndJob:
+
+             RclRsc
+
+     /*---------------------------------------------------------------*/
+     /* Deallocate header work file to allow other runs to execute    */
+     /*---------------------------------------------------------------*/
+
+             DlcObj     Obj( ( OEPFBLog                               +
+                               *File                                  +
+                               *Excl    ) )
+
+             EndPgm

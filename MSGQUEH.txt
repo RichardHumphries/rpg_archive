@@ -1,0 +1,109 @@
+      /If Not Defined( MsgQueHCopied )
+      /Define          MsgQueHCopied
+      /Else
+      /Eof
+      /EndIf
+
+      *=====================================================================
+      * Message Queue Header
+      *
+      * Copyright (C) Julian Monypenny 1997
+      *=====================================================================
+      /Copy EukCopySrc/QRPGLESRC,StdTypH
+
+     D SysMsgFil       C                   'QCPFMSG'
+     D SysMsgLib       C                   '*LIBL'
+
+     D OldMsgAct       C                   '*OLD'
+     D RemoveMsgAct    C                   '*REMOVE'
+     D SameMsgAct      C                   '*SAME'
+
+     D AnyMsgTyp       C                   '*ANY'
+     D CompMsgTyp      C                   '*COMP'
+     D CopyMsgTyp      C                   '*COPY'
+     D DiagMsgTyp      C                   '*DIAG'
+     D EscapeMsgTyp    C                   '*ESCAPE'
+     D ExcpMsgTyp      C                   '*EXCP'
+     D FirstMsgTyp     C                   '*FIRST'
+     D InfoMsgTyp      C                   '*INFO'
+     D LastMsgTyp      C                   '*LAST'
+     D NextMsgTyp      C                   '*NEXT'
+     D NotifyMsgTyp    C                   '*NOTIFY'
+     D PrevMsgTyp      C                   '*PRV'
+     D ReplyMsgTyp     C                   '*RPY'
+     D RequestMsgTyp   C                   '*RQS'
+
+     D CurrMsgStk      C                   0
+     D PrevMsgStk      C                   1
+     D PrevPgmMsgStk   C                   2
+
+     D CurrMsgQue      C                   '*'
+
+      *---------------------------------------------------------------------
+     D ClearMsgQue     Pr                  Like( LglTyp )
+      *---------------------------------------------------------------------
+     D  MsgStk                             Like( IntTyp )     Value
+     D                                     Options( *NoPass )
+     D  MsgQue                             Like( NamTyp )     Value
+     D                                     Options( *NoPass )
+
+      *---------------------------------------------------------------------
+     D GetMsgFrmQue    Pr                  Like( LglTyp )
+      *---------------------------------------------------------------------
+     D  MsgTyp                             Like( NamTyp )     Value
+     D  MsgQueDta                          Like( MsgQueDtaDs )
+     D  MsgAct                             Like( NamTyp )     Value
+     D                                     Options( *NoPass )
+     D  MsgStk                             Like( IntTyp )     Value
+     D                                     Options( *NoPass )
+     D  MsgQue                             Like( NamTyp )     Value
+     D                                     Options( *NoPass )
+
+     D MsgQueDtaDs     Ds                  Inz
+     D  MsgQDtaLen                         Like( IntTyp )
+     D  MsgQDtaSiz                         Like( IntTyp )
+     D  MsgQSvr                            Like( IntTyp )
+     D  MsgQId                             Like( MsgIdTyp )
+     D  MsgQTyp                       2
+     D  MsgQKey                       4
+     D  MsgQFil                            Like( NamTyp )
+     D  MsgQLibSpc                         Like( NamTyp )
+     D  MsgQLibUse                         Like( NamTyp )
+     D  MsgQSndJob                         Like( NamTyp )
+     D  MsgQSndUsr                         Like( NamTyp )
+     D  MsgQSndJobNbr                 6
+     D  MsgQSndPgm                   12
+     D  MsgQSndIns                    4
+     D  MsgQSndDat                    7
+     D  MsgQSndTim                    6
+     D  MsgQRcvPgm                         Like( NamTyp )
+     D  MsgQRcvIns                    4
+     D  MsgQSndTyp                         Like( ChrTyp )
+     D  MsgQRcvTyp                         Like( ChrTyp )
+     D                                1
+     D  MsgQTxtCcsId                       Like( IntTyp )
+     D  MsgQDtaCcsId                       Like( IntTyp )
+     D  MsgQAlrOpt                    9
+     D  MsgQMsgCcsId                       Like( IntTyp )
+     D  MsgQRplCcsId                       Like( IntTyp )
+     D  MsgQRplPos                         Like( IntTyp )
+     D  MsgQRplLen                         Like( IntTyp )
+     D  MsgQMsgPos                         Like( IntTyp )
+     D  MsgQMsgLen                         Like( IntTyp )
+     D  MsgQHlpPos                         Like( IntTyp )
+     D  MsgQHlpLen                         Like( IntTyp )
+     D  MsgQVarDta                 2000
+
+      *---------------------------------------------------------------------
+     D PutMsgOnQue     Pr                  Like( LglTyp )
+      *---------------------------------------------------------------------
+     D  MsgFil                             Like( NamTyp )     Value
+     D  MsgLib                             Like( NamTyp )     Value
+     D  MsgId                              Like( MsgIdTyp )   Value
+     D  MsgTyp                             Like( NamTyp )     Value
+     D  MsgTxt                             Like( StrTyp )     Value
+     D                                     Options( *NoPass )
+     D  MsgStk                             Like( IntTyp )     Value
+     D                                     Options( *NoPass )
+     D  MsgQue                             Like( NamTyp )     Value
+     D                                     Options( *NoPass )

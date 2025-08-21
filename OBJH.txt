@@ -1,0 +1,88 @@
+      /If Not Defined( ObjHCopied )
+      /Define          ObjHCopied
+      /Else
+      /Eof
+      /EndIf
+
+      *=====================================================================
+      * Object Header
+      *
+      * Copyright (C) Julian Monypenny 1997
+      *=====================================================================
+      /Copy EukCopySrc/QRPGLESRC,StdTypH
+
+      *---------------------------------------------------------------------
+     D ObjExists       Pr                  Like( LglTyp )
+      *---------------------------------------------------------------------
+     D  ObjNam                             Like( NamTyp )  Value
+     D  ObjLib                             Like( NamTyp )  Value
+      *   Name, *CURLIB, or *LIBL
+     D  ObjTyp                             Like( NamTyp )  Value
+
+      *---------------------------------------------------------------------
+     D GetObjDsc       Pr                  Like( LglTyp )
+      *---------------------------------------------------------------------
+     D  ObjNam                             Like( NamTyp )  Value
+     D  ObjLib                             Like( NamTyp )  Value
+      *   Name, *CURLIB, or *LIBL
+     D  ObjTyp                             Like( NamTyp )  Value
+     D  DscFmt                             Like( ApiFmtTyp )  Value
+     D  ObjDsc                             Like( ObjDscDs )
+
+     D BrfObjDscFmt    C                   'OBJD0200'
+     D DtlObjDscFmt    C                   'OBJD0400'
+
+     D ObjDscDs        Ds                  Inz
+      * BrfObjDscFmt
+     D  ObjDscLen                          Like( IntTyp )
+     D  ObjDscSiz                          Like( IntTyp )
+     D  ObjNam                             Like( NamTyp )
+     D  ObjLib                             Like( NamTyp )
+     D  ObjTyp                             Like( NamTyp )
+     D  ObjRtnLib                          Like( NamTyp )
+     D  ObjAsp                             Like( IntTyp )
+     D  ObjOwnr                            Like( NamTyp )
+     D  ObjDmn                        2
+     D  ObjCrtDtm                    13
+     D  ObjChgDtm                    13
+     D  ObjAtr                             Like( NamTyp )
+     D  ObjTxt                             Like( TxtTyp )
+     D  ObjSrcFil                          Like( NamTyp )
+     D  ObjSrcLib                          Like( NamTyp )
+     D  ObjSrcMbr                          Like( NamTyp )
+      * DtlObjDscFmt
+     D  ObjSrcChgDtm                 13
+     D  ObjSavDtm                    13
+     D  ObjRstDtm                    13
+     D  ObjCrtUsr                          Like( NamTyp )
+     D  ObjCrtSys                     8
+     D  ObjResDat                     7
+     D  ObjSavSiz                          Like( IntTyp )
+     D  ObjSavSeq                          Like( IntTyp )
+     D  ObjStg                             Like( NamTyp )
+     D  ObjSavCmd                          Like( NamTyp )
+     D  ObjSavVolId                  71
+     D  ObjSavDvc                          Like( NamTyp )
+     D  ObjSavFil                          Like( NamTyp )
+     D  ObjSavLib                          Like( NamTyp )
+     D  ObjSavLbl                    17
+     D  ObjSavLvl                     9
+     D  ObjCompiler                  16
+     D  ObjLvl                        8
+     D  ObjUsrChg                          Like( ChrTyp )
+     D  ObjLicPgm                    16
+     D  ObjPtf                             Like( NamTyp )
+     D  ObjApar                            Like( NamTyp )
+     D  ObjUseDat                     7
+     D  ObjUsgInf                          Like( ChrTyp )
+     D  ObjUseDay                          Like( IntTyp )
+     D  ObjSiz                             Like( IntTyp )
+     D  ObjSizMlt                          Like( IntTyp )
+     D  ObjCprSts                          Like( ChrTyp )
+     D  ObjAlwChg                          Like( ChrTyp )
+     D  ObjChgByPgm                        Like( ChrTyp )
+     D  ObjUsrAtr                          Like( NamTyp )
+     D  ObjOvrflwAsp                       Like( ChrTyp )
+     D  ObjSavActDtm                 13
+     D  ObjAudVal                          Like( NamTyp )
+     D  ObjPrmGrp                          Like( NamTyp )

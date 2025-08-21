@@ -1,0 +1,299 @@
+     H Option( *NoDebugIO )
+
+      *---------------------------------------------------------------*
+      * Project:   Store Grades & Packages Bulk Upload Process        *
+      * Developer: Richard Humphries                                  *
+      * Company:   S.S.S. Ltd.                                        *
+      * Date:      10th September 2003                                *
+      *                                                               *
+      * Title:     Range Change Upload                                *
+      * Program:   RMRGRDNPKG                                         *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+     FRMLGrade1 UF   E           K Disk    Prefix( New_ )
+
+     FCustomer  IF   E           K Disk    Prefix( Cus_ )
+
+     FCuLGrad2  IF   E           K Disk    Rename( Grad01:GradeChk )
+     F                                     Prefix( Chk_ )
+
+     FCuLGrad1  UF A E           K Disk
+
+     FCuPAudit2 O    E           K Disk
+
+      *---------------------------------------------------------------*
+      * Definition Specifications                                     *
+      *---------------------------------------------------------------*
+
+     D                SDs
+     DProgName           *Proc
+     DNbr_Parms          *Parms
+     DData                    91    170
+     DErrorFile              175    184
+     DJobName                244    253
+     DUser                   254    263
+     DToday                  270    275  0
+
+     DIn_CustFmt       Ds
+     D In_Type                 1      1
+     D In_Medium               2      2
+     D In_Format               3      4
+     D In_Size                 5      6
+
+     D Blank_size      S              2    Inz
+     D Chart_Range     S              4    Inz ('CHRT')
+     D Rcd_Changed     S              1    Inz
+     D Out_Count       S              7P 0
+
+      *---------------------------------------------------------------*
+      * Mainline                                                      *
+      *---------------------------------------------------------------*
+
+     C     KeyRMLGrade1  SetLL     RMLGrade1
+     C     KeyRMLGrade1  ReadE     RMLGrade1
+
+  b1 C                   DoW       Not(%Eof(RMLGrade1))
+
+     C                   Eval      Out_Count   = Out_Count + 1
+
+  b2 C                   If        New_GrRnge  = 'CATG'
+     C                   Eval      New_GrRnge  = *Blanks
+  e2 C                   EndIf
+
+     C                   ExSr      ChkStrSetUp
+
+     C                   Delete    RMRGrade
+
+     C     KeyRMLGrade1  ReadE     RMLGrade1
+
+  e1 C                   EndDo
+
+     C                   Eval      *InLr       = *On
+     C                   Return
+
+      *---------------------------------------------------------------*
+      *  Check the store grade & package details                      *
+      *---------------------------------------------------------------*
+
+     C     ChkStrSetUp   BegSr
+
+     C     New_GRAcNo    Chain     Customer
+
+  b1 C                   If        %Found      ( Customer )
+
+     C     KeyCuLGrad1   Chain     CuLGrad1
+
+  b2 C                   If        %Found      ( CuLGrad1 )
+     C                   ExSr      UpdStrSetUp
+  x2 C                   Else
+     C                   ExSr      AddStrSetUp
+  e2 C                   EndIf
+
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Add the store grade & package details                        *
+      *---------------------------------------------------------------*
+
+     C     AddStrSetUp   BegSr
+
+     C                   Clear                   Grad01
+
+      * If the new grade is blank for PROM get it from CHRT
+
+  b1 C                   If        New_GrGrad  = *blank  and
+     C                             New_GrRnge  = 'PROM'
+     C                   ExSr      GetChtGrd
+  e1 C                   EndIf
+
+      * If the new grade for CHRT is blank and format has a size then get
+      * the grade for the non-sized format
+
+  b1 C                   If        New_GrGrad  = *Blank  and
+     C                             New_GrRnge  = 'CHRT'  and
+     C                             New_GrSize <> '  '
+     C                   ExSr      GetChtGrd
+  e1 C                   EndIf
+
+     C                   Eval      Prognm      = ProgName
+     C                   Eval      RecMod      = User
+     C                   Eval      RecAdd      = Today
+     C                   Eval      Acount      = New_GRAcNo
+     C                   Eval      GrType      = New_GrType
+     C                   Eval      GrMed       = New_GrMed
+     C                   Eval      GrFmt       = New_GrFmt
+     C                   Eval      GrSize      = In_Size
+     C                   Eval      GrRnge      = New_GrRnge
+     C                   Eval      GrGenr      = New_GrGenr
+     C                   Eval      GrdMo       = New_GrdMo
+     C                   Eval      Recovr      = New_GrPckg
+     C                   Eval      Pgrade      = New_GrGrad
+     C                   Write     Grad01
+     C                   ExSr      AudDtlAdd
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Update the store grade & package details                     *
+      *---------------------------------------------------------------*
+
+     C     UpdStrSetUp   BegSr
+
+     C                   Eval      Rcd_Changed = 'N'
+
+      * Do the package bit
+
+  b1 C                   If        New_GrPckg <> Recovr
+     C                   Eval      Rcd_Changed = 'Y'
+     C                   ExSr      AudPkgChg
+     C                   Eval      Recovr      = New_GrPckg
+  e1 C                   EndIf
+
+      * Do the grade bit but only if new grade isn't blank (CHRT or PROM)
+
+  b1 C                   If        New_GrGrad <> Pgrade  and
+     C                             New_GrGrad <> *blank
+     C                   Eval      Rcd_Changed = 'Y'
+     C                   ExSr      AudGrdChg
+     C                   Eval      Pgrade      = New_GrGrad
+  e1 C                   EndIf
+
+      * If the current grade is blank for PROM get it from CHRT or if the
+      * format is sized and is CHRT get non-sized CHRT grade.
+  b1 C                   If        (Pgrade     = *blank  and
+     C                             GrRnge      = 'PROM')      or
+     C                             (Pgrade     = *blank  and
+     C                             GrRnge      = 'CHRT'  and
+     C                             GrSize     <> '  '  )
+     C                   ExSr      GetChtGrd
+     C                   Eval      Rcd_Changed = 'Y'
+     C                   ExSr      AudGrdChg
+     C                   Eval      Pgrade      = New_GrGrad
+  e1 C                   EndIf
+
+  b1 C                   If        Rcd_Changed = 'Y'
+     C                   Eval      Prognm      = ProgName
+     C                   Eval      RecMod      = User
+     C                   Eval      RecChg      = Today
+     C                   Update    Grad01
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Audit the package change                                     *
+      *---------------------------------------------------------------*
+
+     C     AudPkgChg     BegSr
+
+     C                   Eval      CuTxtLn     = In_CustFmt + ',' + New_GrRnge +
+     C                                           ',' + %CHAR(Recovr) + ','     +
+     C                                           ' PACKAGE Changed to '        +
+     C                                           %Char(New_GrPckg)
+     C                   Time                    CuRecA
+     C                   Eval      CuRecU      = User
+     C                   Eval      CuRecP      = ProgName
+     C                   Eval      Acount      = New_GRAcNo
+     C                   Write     CURAUD2R
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Audit the grade change                                       *
+      *---------------------------------------------------------------*
+
+     C     AudGrdChg     BegSr
+
+     C                   Eval      CuTxtLn     = In_CustFmt + ',' + New_GrRnge +
+     C                                           ',' + PGrade  + ','           +
+     C                                           New_GrGenr                    +
+     C                                           ' Grade Changed to '          +
+     C                                           New_GrGrad
+     C                   Time                    CuRecA
+     C                   Eval      CuRecU      = User
+     C                   Eval      CuRecP      = ProgName
+     C                   Eval      Acount      = New_GRAcNo
+     C                   Write     CURAUD2R
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Audit the adding of grade & package                          *
+      *---------------------------------------------------------------*
+
+     C     AudDtlAdd     BegSr
+
+     C                   Eval      CuTxtLn     = In_CustFmt + ',' + New_GrRnge +
+     C                                           ',' + New_GrGrad + ','        +
+     C                                           New_GrGenr                    +
+     C                                           ' Grade Added '
+     C                   Time                    CuRecA
+     C                   Eval      CuRecU      = User
+     C                   Eval      CuRecP      = ProgName
+     C                   Eval      Acount      = New_GRAcNo
+     C                   Write     CURAUD2R
+
+     C                   Eval      CuTxtLn     = In_CustFmt + ',' + New_GrRnge +
+     C                                           ',' + %CHAR(Recovr) +','      +
+     C                                           New_GrGenr                    +
+     C                                           ' PACKAGE added '
+     C                   Write     CURAUD2R
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Get the PROM grade from CHRT                                 *
+      *---------------------------------------------------------------*
+
+     C     GetChtGrd     BegSr
+
+     C     KeyCuLGrad2   Chain(E)  CuLGrad2
+
+  b1 C                   If        %Found(CuLGrad2)
+     C                   Eval      New_GrGrad = Chk_Pgrade
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *---------------------------------------------------------------*
+      *  Initial sub-routine                                          *
+      *---------------------------------------------------------------*
+
+     C     *InzSr        BegSr
+
+     C     *Entry        PList
+     C                   Parm                    In_CustFmt
+     C                   Parm                    Out_Count
+
+     C     KeyCuLGrad1   KList
+     C                   KFld                    New_GRAcNo
+     C                   KFld                    New_GrdMo
+     C                   KFld                    New_GrRnge
+     C                   KFld                    New_GrGenr
+     C                   KFld                    New_GrType
+     C                   KFld                    New_GrMed
+     C                   KFld                    New_GrFmt
+     C                   KFld                    In_Size
+
+     C     KeyRMLGrade1  KList
+     C                   KFld                    In_Type
+     C                   KFld                    In_Medium
+     C                   KFld                    In_Format
+     C                   KFld                    In_Size
+
+     C     KeyCuLGrad2   KList
+     C                   KFld                    New_GRAcNo
+     C                   KFld                    New_GrType
+     C                   KFld                    New_GrMed
+     C                   KFld                    New_GrFmt
+     C                   KFld                    Blank_Size
+     C                   KFld                    Chart_Range
+
+     C                   EndSr

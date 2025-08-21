@@ -1,0 +1,94 @@
+      *---------------------------------------------------------------*
+      * Project:   FTP File Transmission Processing                   *
+      * Developer: Richard Humphries                                  *
+      * Company:   M.M.T. Computing PLC                               *
+      * Date:      25th April 2001                                    *
+      *                                                               *
+      * Title:     Retrieve FTP Details                               *
+      * Program:   OER041                                             *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+      * Description File
+
+     FDesc      IF   E           K Disk
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D CompanyNo       S              2    Inz( '01' )
+     D FTPDetsRqd      S              4
+     D IPAddress       S             30
+     D UserName        S             30
+     D Password        S             30
+     D ToDir           S             30
+
+      * Description File Key
+
+     C     KeyDesc       KList
+     C                   KFld                    CompanyNo
+     C                   KFld                    FTPDetsRqd
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+     C     KeyDesc       SetLL     Desc
+
+  b1 C                   DoW       Not %EoF ( Desc )
+
+     C     KeyDesc       ReadE     Desc
+
+  b2 C                   If        %EoF ( Desc )
+     C                   Leave
+  e2 C                   EndIf
+
+  b2 C                   Select
+
+  s2 C                   When      PSar15    = 'IPADDRESS '
+     C                   Eval      IPAddress = PrmD15
+
+  s2 C                   When      PSar15    = 'USERNAME  '
+     C                   Eval      UserName  = PrmD15
+
+  s2 C                   When      PSar15    = 'PASSWORD  '
+     C                   Eval      Password  = PrmD15
+
+  s2 C                   When      PSar15    = 'TODIR     '
+     C                   Eval      ToDir     = PrmD15
+
+  e2 C                   EndSl
+
+  e1 C                   EndDo
+
+     C                   Eval      *InLR = *On
+     C                   Return
+
+      *========================*
+      * *InzSr                 *
+      *========================*
+
+     C     *InzSr        BegSr
+
+      * Entry Parameters
+
+     C     *Entry        PList
+     C                   Parm                    FTPDetsRqd
+     C                   Parm                    IPAddress
+     C                   Parm                    UserName
+     C                   Parm                    Password
+     C                   Parm                    ToDir
+
+      * Initialise Fields
+
+     C                   Eval      CompanyNo = '01'
+     C                   Eval      IPAddress = *Blanks
+     C                   Eval      UserName  = *Blanks
+     C                   Eval      Password  = *Blanks
+
+     C                   EndSr

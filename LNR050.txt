@@ -1,0 +1,313 @@
+      *---------------------------------------------------------------*
+      * Project:   Supplier Returns Lotus Notes Interface             *
+      * Developer: Richard Humphries                                  *
+      * Company:   S.S.S. Ltd.                                        *
+      * Date:      21st November 2001                                 *
+      *                                                               *
+      * Title:     PRF Split Process - Over 133 Lines                 *
+      * Program:   LNR050                                             *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+      * Returns Tracking Header File
+
+     FSRLTrkH1  UF A E           K Disk
+
+      * Returns Tracking Detail File
+
+     FSRLTrkI1  UF   E           K Disk
+
+      * Supplier Returns - Damaged RA File
+
+     FSRPDmHdr  IF A E           K Disk
+
+      * Description File
+
+     FDesc      UF   E           K Disk
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D Company         S              2    Inz('01')
+     D P1PRFN          S              8P 0
+     D NewPRFN         S              8P 0
+     D @Count          S              7P 0
+     D PRFNChar        S              8
+     D CmdStr          S            256
+     D CmdLen          S             15P 5 Inz( 256 )
+
+     D WkRUni          S                   Like( TIRUni )
+     D WkRVal          S                   Like( TIRVal )
+     D WkAUni          S                   Like( TIAUni )
+     D WkAVal          S                   Like( TIAVal )
+     D WkLUni          S                   Like( TILUni )
+     D WkLVal          S                   Like( TILVal )
+     D WkPUni          S                   Like( TIPUni )
+     D WkPVal          S                   Like( TIPVal )
+     D WkDUni          S                   Like( TIDUni )
+     D WkDVal          S                   Like( TIDVal )
+     D WkCrUn          S                   Like( TICrUn )
+     D WkCrAl          S                   Like( TICrAl )
+
+     D SvRUni          S                   Like( THRUni )
+     D SvRVal          S                   Like( THRVal )
+     D SvAUni          S                   Like( THAUni )
+     D SvAVal          S                   Like( THAVal )
+     D SvLUni          S                   Like( THLUni )
+     D SvLVal          S                   Like( THLVal )
+     D SvPUni          S                   Like( THPUni )
+     D SvPVal          S                   Like( THPVal )
+     D SvDUni          S                   Like( THDUni )
+     D SvDVal          S                   Like( THDVal )
+     D SvCrUn          S                   Like( THCrUn )
+     D SvCrVl          S                   Like( THCrVl )
+
+      *---------------------------------------------------------------*
+      *  Key Lists                                                    *
+      *---------------------------------------------------------------*
+
+     C     KeySRLTrkH1   KList
+     C                   KFld                    Company
+     C                   KFld                    P1PRFN
+
+     C     KeySRLTrkI1   KList
+     C                   KFld                    Company
+     C                   KFld                    P1PRFN
+
+     C     KeySRPDmHdr   KList
+     C                   KFld                    Company
+     C                   KFld                    THSupp
+     C                   KFld                    P1PRFN
+
+     C     KeyDesc       KList
+     C                   KFld                    Company
+     C                   KFld                    Prmt15
+     C                   KFld                    PSar15
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+     C                   ExSr      @ProcessDtl
+
+     C                   ExSr      @SplitHeader
+
+     C                   Eval      *InLr = *On
+     C                   Return
+
+      *==============================================================*
+      * Write Detail Records                                         *
+      *==============================================================*
+
+     C     @ProcessDtl   BegSr
+
+     C     KeySRLTrkI1   SetLL     SRLTrkI1
+
+  b1 C                   DoW       Not %EoF ( SRLTrkI1 )
+
+     C     KeySRLTrkI1   ReadE     SRLTrkI1                               98
+
+  b2 C                   If        %EoF ( SRLTrkI1 )
+     C                   Leave
+  e2 C                   EndIf
+
+  b2 C                   If        Not %Equal ( SRLTrkI1 )
+     C                   Leave
+  e2 C                   EndIf
+
+      * Accumulate Totals for Header Processing
+
+     C                   Eval      @Count = @Count + 1
+
+      * Once we reach 134 - Allocate new PRF Number
+
+  b2 C                   If        @Count = 134
+
+      * Allocate New PRF Number
+
+    €C                   Eval      Prmt15 = 'LSTN'
+
+
+  b3 C                   If        P1PRFN > 1000000
+    €C                   Eval      PSar15 = 'PRFF'
+  x3 C                   Else
+    €C                   Eval      PSar15 = 'PRFG'
+  e3€C                   EndIf
+
+    €C     KeyDesc       Chain     Desc
+
+  b3€C                   If        %Found ( Desc )
+    €C                   Eval      PRML15  = PRML15 + 1
+    €C                   Update    InR15
+    €C                   Eval      NewPRFN = PRML15
+  e3€C                   EndIf
+
+  e2 C                   EndIf
+
+      * Update records with new PRF number of count is over 133
+
+  b2 C                   If        @Count > 133
+
+     C                   Eval      TIPRFN = NewPRFN
+     C                   Update    SRPTrkDIR
+
+     C                   ExSr      @UpdFaultLoc
+
+  e2 C                   EndIf
+
+  e1 C                   EndDo
+
+     C                   EndSr
+
+      *==============================================================*
+      * Split Header Record                                          *
+      *==============================================================*
+
+     C     @SplitHeader  BegSr
+
+      *---------------------------------------------------------------*
+      *  Count Number of Lines in a PRF                               *
+      *---------------------------------------------------------------*
+
+     C/Exec Sql
+     C+
+     C+         Select   Sum( TIRUni ) ,
+     C+                  Sum( TIRVal ) ,
+     C+                  Sum( TIAUni ) ,
+     C+                  Sum( TIAVal ) ,
+     C+                  Sum( TILUni ) ,
+     C+                  Sum( TILVal ) ,
+     C+                  Sum( TIPUni ) ,
+     C+                  Sum( TIPVal ) ,
+     C+                  Sum( TIDUni ) ,
+     C+                  Sum( TIDVal ) ,
+     C+                  Sum( TICrUn ) ,
+     C+                  Sum( TICrAl )
+     C+
+     C+         Into         :WkRUni   ,
+     C+                      :WkRVal   ,
+     C+                      :WkAUni   ,
+     C+                      :WkAVal   ,
+     C+                      :WkLUni   ,
+     C+                      :WkLVal   ,
+     C+                      :WkPUni   ,
+     C+                      :WkPVal   ,
+     C+                      :WkDUni   ,
+     C+                      :WkDVal   ,
+     C+                      :WkCrUn   ,
+     C+                      :WkCrAl
+     C+
+     C+         From          SRLTrkI1
+     C+
+     C+         Where         TICoNo = :Company And
+     C+                       TIPRFN = :P1PRFN
+     C+
+     C/End-Exec
+
+      * Update Existing Header with new Values and then Write new Header
+
+     C     KeySRLTrkH1   Chain     SRLTrkH1
+
+  b1 C                   If        %Found ( SRLTrkH1 )
+
+     C                   Eval      SvRUni = THRUni - WkRUni
+     C                   Eval      SvRVal = THRVal - WkRVal
+     C                   Eval      SvAUni = THAUni - WkAUni
+     C                   Eval      SvAVal = THAVal - WkAVal
+     C                   Eval      SvLUni = THLUni - WkLUni
+     C                   Eval      SvLVal = THLVal - WkLVal
+     C                   Eval      SvPUni = THPUni - WkPUni
+     C                   Eval      SvPVal = THPVal - WkPVal
+     C                   Eval      SvDUni = THDUni - WkDUni
+     C                   Eval      SvDVal = THDVal - WkDVal
+     C                   Eval      SvCRUn = THCRUn - WkCrUn
+     C                   Eval      SvCrVl = THCrVl - WkCrAl
+
+     C                   Eval      THRUni = WkRUni
+     C                   Eval      THRVal = WkRVal
+     C                   Eval      THAUni = WkAUni
+     C                   Eval      THAVal = WkAVal
+     C                   Eval      THLUni = WkLUni
+     C                   Eval      THLVal = WkLVal
+     C                   Eval      THPUni = WkPUni
+     C                   Eval      THPVal = WkPVal
+     C                   Eval      THDUni = WkDUni
+     C                   Eval      THDVal = WkDVal
+     C                   Eval      THCRUn = WkCrUn
+     C                   Eval      THCrVl = WkCrAl
+
+     C                   Update    SRPTrakHr
+
+     C                   Eval      THPRFN = NewPRFN
+     C                   Eval      THRUni = SvRUni
+     C                   Eval      THRVal = SvRVal
+     C                   Eval      THAUni = SvAUni
+     C                   Eval      THAVal = SvAVal
+     C                   Eval      THLUni = SvLUni
+     C                   Eval      THLVal = SvLVal
+     C                   Eval      THPUni = SvPUni
+     C                   Eval      THPVal = SvPVal
+     C                   Eval      THDUni = SvDUni
+     C                   Eval      THDVal = SvDVal
+     C                   Eval      THCRUn = SvCRUn
+     C                   Eval      THCrVl = SvCrVl
+
+      * If new PRF has been generated then write new record(s)
+
+  b2 C                   If        NewPRFN <> *Zeros
+
+     C                   Write     SRPTrakHr
+
+      * Copy SRPDmHdr record if one exists
+
+     C     KeySRPDmHdr   Chain     SRPDmHdr
+
+  b3 C                   If        %Found ( SRPDmHdr )
+     C                   Eval      DmPRFN = NewPRFN
+     C                   Write     SRDmHdr
+  e3 C                   EndIf
+
+  e2 C                   EndIf
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *==============================================================*
+      * @UpdFaultLoc                                                 *
+      *==============================================================*
+
+     C     @UpdFaultLoc  BegSr
+
+     C/Exec Sql
+     C+
+     C+         Update   SRLTrkL2
+     C+
+     C+         Set      LOPRFN = :NewPRFN
+     C+
+     C+         Where    LOCoNo = :Company And
+     C+                  LOPRFN = :P1PRFN  And
+     C+                  LOItem = :TIItem
+     C+
+     C/End-Exec
+
+     C                   EndSr
+
+      *==============================================================*
+      * *InzSr                                                       *
+      *==============================================================*
+
+     C     *InzSr        Begsr
+
+      * Entry Parameters
+
+     C     *Entry        PList
+     C                   Parm                    PRFNChar
+
+     C                   Move      PRFNChar      P1PRFN
+
+     C                   EndSr

@@ -1,0 +1,75 @@
+      *---------------------------------------------------------------*
+      * Project:   FTP File Transmission Processing                   *
+      * Developer: Richard Humphries                                  *
+      * Company:   M.M.T. Computing PLC                               *
+      * Date:      26th April 2001                                    *
+      *                                                               *
+      * Title:     Retrieve New File Name for Transmission            *
+      * Program:   OER042                                             *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+      * File Transmission Error Log File
+
+     FOELFTEL1  IF   E           K Disk
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D P1Code          S              3
+     D P1HHMM          S              4
+     D P1Jul           S              3
+     D P1ToFl          S             30
+     D P1HHMMNum       S              4S 0
+     D Complete        S                   Like( *InLR )
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+  b1 C                   DoW       Complete = *Off
+
+     C                   Eval      P1ToFl   = 'C'    +
+     C                                        P1Code +
+     C                                        P1HHMM +
+     C                                        '.'    +
+     C                                        P1Jul
+
+     C     P1ToFl        Chain     OELFTEL1
+
+  b2 C                   If        %Found ( OELFTEL1 )
+     C                   Move      P1HHMM        P1HHMMNum
+     C                   Eval      P1HHMMNum =   P1HHMMNum + 1
+     C                   Move      P1HHMMNum     P1HHMM
+     C                   Iter
+  e2 C                   EndIf
+
+     C                   Eval      Complete  =   *On
+
+     C                   Leave
+
+  e1 C                   EndDo
+
+     C                   Eval      *InLR = *On
+     C                   Return
+
+      *========================*
+      * *InzSr                 *
+      *========================*
+
+     C     *InzSr        BegSr
+
+      * Entry Parameters
+
+     C     *Entry        PList
+     C                   Parm                    P1Code
+     C                   Parm                    P1HHMM
+     C                   Parm                    P1Jul
+     C                   Parm                    P1ToFl
+
+     C                   EndSr

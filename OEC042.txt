@@ -1,0 +1,250 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   FTP File Transmission Processing                   */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Sunflower Software Solutions Ltd.                  */
+     /* Date:      25th April 2001                                    */
+     /*                                                               */
+     /* Title:     Create FTP File Transmission Member - Parceline    */
+     /* Program:   OEC042                                             */
+     /* Scan:                                                         */
+     /*                                                               */
+     /* a1         5/1/2005      Richard Humphries                    */
+     /* Call OEC041CCL instead of OEC041CL                            */
+     /* a2         6/5/2005      Phil Katz                            */
+     /* Remove Reorg. Reorgs are now automated.                       */
+     /*---------------------------------------------------------------*/
+
+Pgm                     Parm( &CrCar# )
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &HHMM       *Char   Len(   4   )
+             Dcl        &Jul        *Char   Len(   3   )
+             Dcl        &Time       *Char   Len(   6   )
+             Dcl        &Date       *Char   Len(   6   )
+             Dcl        &JulD       *Char   Len(   6   )
+             Dcl        &Code       *Char   Len(   3   )
+             Dcl        &FlNumA     *Char   Len(   3   )
+             Dcl        &FlNum      *Dec    Len(   3 0 )  Value( 0 )
+             Dcl        &Member     *Char   Len(  10   )
+             Dcl        &ToFile     *Char   Len(  30   )
+             Dcl        &FailPass   *Char   Len(   1   )
+
+             DclF       RTPCAR
+
+     /*---------------------------------------------------------------*/
+     /* Get current date and time                                     */
+     /*---------------------------------------------------------------*/
+
+             RtvSysVal  SysVal( QTime )                               +
+                        RtnVar( &Time )
+
+             RtvSysVal  SysVal( QDate )                               +
+                        RtnVar( &Date )
+
+             CvtDat     Date(    &Date   )                            +
+                        ToVar(   &JulD   )                            +
+                        FromFmt( *SysVal )                            +
+                        ToFmt(   *Jul    )                            +
+                        ToSep(   *None   )
+
+             ChgVar     &Jul            %Sst( &JulD 3 3 )
+
+             ChgVar     &HHMM           %Sst( &Time 1 4 )
+
+     /*---------------------------------------------------------------*/
+     /* Lock EDI header workfile                                      */
+     /*---------------------------------------------------------------*/
+
+             AlcObj     Obj( ( OEPEPLH                                +
+                               *File                                  +
+                               *Excl   ) )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve File Details                                         */
+     /*---------------------------------------------------------------*/
+
+             Call       OERPLF        ( &CrCar#                       +
+                                        &CrPDEF                       +
+                                        &CrEUKC )
+
+     /*---------------------------------------------------------------*/
+     /* Stop if File Name is Blank                                    */
+     /*---------------------------------------------------------------*/
+
+             If       ( &CrPDEF = '          ' )                      +
+                                                                      +
+             Do
+
+               Goto     End
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Populate EDI Work File                                        */
+     /*---------------------------------------------------------------*/
+
+     /*---------------------------------------------------------------*/
+     /* Add new member to EDI workfile                                */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     &Code           &CrEUKC
+
+             NewMbr:
+
+             ChgVar     &FlNum        ( &FlNum + 1 )
+             ChgVar     &FlNumA         &FlNum
+             ChgVar     &Member       ( 'C' *TCat &Code   *TCat       +
+                                        %Sst( &JulD 3 3 ) *TCat       +
+                                        &FlNumA                 )
+
+             AddPFM     File( &CrpDef )                               +
+                        Mbr(  &Member )
+
+             MonMsg     CPF0000                                       +
+                        Exec(                                         +
+             Do               )
+
+               Goto     NewMbr
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Copy data to new member                                       */
+     /*---------------------------------------------------------------*/
+
+             CpyF       FromFile( OEPEPLH  )                          +
+                        ToFile(   &CrPDEF  )                          +
+                        ToMbr(    &Member  )                          +
+                        MbrOpt(   *Replace )                          +
+                        FmtOpt(   *NoChk   )
+
+             CpyF       FromFile( OEPEPLD  )                          +
+                        ToFile(   &CrPDEF  )                          +
+                        ToMbr(    &Member  )                          +
+                        MbrOpt(   *Add     )                          +
+                        FmtOpt(   *NoChk   )
+
+             CpyF       FromFile( OEPEPLT  )                          +
+                        ToFile(   &CrPDEF  )                          +
+                        ToMbr(    &Member  )                          +
+                        MbrOpt(   *Add     )                          +
+                        FmtOpt(   *NoChk   )
+
+     /*---------------------------------------------------------------*/
+     /* Create rolling backup copy of above three files               */
+     /*---------------------------------------------------------------*/
+
+             CpyF       FromFile( BackUpLib/OEPEPLHBU1 )              +
+                        ToFile(   BackUpLib/OEPEPLHBU2 )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( BackUpLib/OEPEPLHBU  )              +
+                        ToFile(   BackUpLib/OEPEPLHBU1 )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( OEPEPLH              )              +
+                        ToFile(   BackUpLib/OEPEPLHBU  )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( BackUpLib/OEPEPLDBU1 )              +
+                        ToFile(   BackUpLib/OEPEPLDBU2 )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( BackUpLib/OEPEPLDBU  )              +
+                        ToFile(   BackUpLib/OEPEPLDBU1 )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( OEPEPLD              )              +
+                        ToFile(   BackUpLib/OEPEPLDBU  )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( BackUpLib/OEPEPLTBU1 )              +
+                        ToFile(   BackUpLib/OEPEPLTBU2 )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( BackUpLib/OEPEPLTBU  )              +
+                        ToFile(   BackUpLib/OEPEPLTBU1 )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+             CpyF       FromFile( OEPEPLT              )              +
+                        ToFile(   BackUpLib/OEPEPLTBU  )              +
+                        MbrOpt(   *Replace             )              +
+                        FromRcd(  1                    )
+
+             MonMsg     MsgID(    CPF2817              )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve New File Name for Transmission                       */
+     /*---------------------------------------------------------------*/
+
+             Call       OER042        (  &Code                        +
+                                         &HHMM                        +
+                                         &Jul                         +
+                                         &ToFile )
+
+     /*---------------------------------------------------------------*/
+     /* Send File using FTP                                           */
+     /*---------------------------------------------------------------*/
+
+             Call       OEC041CCL     (  &CrPDEF                      +
+                                         &Member                      +
+                                         &ToFile                      +
+                                         &FailPass                    +
+                                         'B'       )
+
+             RclRsc
+
+     /*---------------------------------------------------------------*/
+     /* Reorganise manifested boxes file                              */
+     /*---------------------------------------------------------------*/
+
+/* A2 ****** RgzPFM     OEPBoxM ************************************ */
+
+/* A2 ****** MonMsg     MsgID(    CPF0000              ) *********** */
+
+     /*---------------------------------------------------------------*/
+     /* Clear work files                                              */
+     /*---------------------------------------------------------------*/
+
+             ClrPFM     OEPEPLH
+             ClrPFM     OEPEPLD
+             ClrPFM     OEPEPLT
+
+     /*---------------------------------------------------------------*/
+     /* Unlock EDI header workfile                                    */
+     /*---------------------------------------------------------------*/
+
+             DlcObj     Obj( ( OEPEPLH                                +
+                               *File                                  +
+                               *Excl   ) )
+
+End:
+
+EndPgm

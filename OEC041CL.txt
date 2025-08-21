@@ -1,0 +1,485 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   FTP File Transmission Processing                   */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Sunflower Software Solutions Ltd.                  */
+     /* Date:      25th April 2001                                    */
+     /*                                                               */
+     /* Title:     FTP File Transmission Processing                   */
+     /* Program:   OEC041CL                                           */
+     /* Scan:                                                         */
+     /*                                                               */
+     /* Modified:  11/06/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Add Flowboth Processing                            */
+     /* Scan:      rh1                                                */
+     /*                                                               */
+     /* Modified:  20/06/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Send Message to History Log on Completion          */
+     /* Scan:      rh2                                                */
+     /*                                                               */
+     /* Modified:  21/06/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Add POS and SWOP Processing                        */
+     /* Scan:      rh3                                                */
+     /*                                                               */
+     /* Modified:  16/07/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Ping IP Address before issuing SndFTPF Command     */
+     /* Scan:      rh4                                                */
+     /*                                                               */
+     /* Modified:  25/07/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Possibility of a loop if 'r' taken as answer       */
+     /* Scan:      rh5                                                */
+     /*                                                               */
+     /* Modified:  06/09/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Add extra POS and SWOP Processing                  */
+     /* Scan:      rh7                                                */
+     /*                                                               */
+     /* Modified:  29/10/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Split POS and SWOP Processing                      */
+     /* Scan:      rh7                                                */
+     /*                                                               */
+     /* Modified:  26/10/2001                                         */
+     /* by:        Tejinder Arora                                     */
+     /* Reason:    Add CountryWide Processing                         */
+     /* Scan:      Tej1                                               */
+     /*                                                               */
+     /* Modified:  04/04/2003                                         */
+     /* by:        Julian McGuire                                     */
+     /* Reason:    Skip proceesing for Countrywide whilst their FTP   */
+     /*            link is not working.                               */
+     /* Scan:      JM1                                                */
+     /*                                                               */
+     /* Modified:  17/06/2003                                         */
+     /* by:        Julian McGuire                                     */
+     /* Reason:    Add TwoWay Processing.                             */
+     /* Scan:      JM2                                                */
+     /*                                                               */
+     /* Modified:  18/10/2005  (SPIT1593)                             */
+     /* by:        Phil Katz                                          */
+     /* Reason:    If FTP error, retry automatically 5 times.         */
+     /*            If still unable to FTP the file after 5 mins       */
+     /*            then get the Operators to intervene.               */
+     /* Scan:      PK1                                                */
+     /*                                                               */
+     /* Modified:  10/07/2007  (P1070038)                             */
+     /* by:        Gerald Wigmore                                     */
+     /* Reason:    Add processing for DeeSet                          */
+     /* Scan:      GW1                                                */
+     /*                                                               */
+     /* Modified:  30/10/2007                                         */
+     /* by:        BIT Consulting / Graham Moxon                      */
+     /* Reason:    Send Email if email address found                  */
+     /*            Use new pgm OER041A (OER041 with extra parms)      */
+     /* Scan:      A02                                                */
+     /*---------------------------------------------------------------*/
+
+Pgm                     Parm( &File                                   +
+                              &Member                                 +
+                              &ToFile                                 +
+                              &FailPass                               +
+                              &IntBatch )
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &FTPDetsRqd *Char   Len(   4   )
+             Dcl        &File       *Char   Len(  10   )
+             Dcl        &Member     *Char   Len(  10   )
+             Dcl        &ToFile     *Char   Len(  30   )
+             Dcl        &ToDir      *Char   Len(  30   )
+             Dcl        &IPAddr     *Char   Len(  30   )
+             Dcl        &UserName   *Char   Len(  30   )
+             Dcl        &Password   *Char   Len(  30   )
+             Dcl        &CmdStr     *Char   Len( 256   )
+             Dcl        &CmdLen     *Dec    Len(  15 5 )  Value( 256 )
+             Dcl        &Reply      *Char   Len(   1   )
+             Dcl        &FailPass   *Char   Len(   1   )
+             Dcl        &IntBatch   *Char   Len(   1   )
+             Dcl        &MsgQ       *Char   Len(  10   )
+             Dcl        &User       *Char   Len(  10   )
+             Dcl        &LibFile    *Char   Len(  21   )
+             Dcl        &Lib        *Char   Len(  10   )
+             Dcl        &Msg        *Char   Len( 200   )
+             Dcl        &Prefix     *Char   Len(   4   )
+/* A1 */     Dcl        &Count      *Dec    Len(   3 0 )  Value( 0 )
+             DCL        &EmailMsg   *CHAR   Len( 100   ) /*A02*/
+             DCL        &EmailSub   *CHAR   Len(  40   ) /*A02*/
+             DCL        &EmailAddr  *CHAR   Len(  30   ) /*A02*/
+             DCL        &BlankParm  *CHAR   Len(  30   ) /*A02*/
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve FTP Details                                          */
+     /*---------------------------------------------------------------*/
+
+     /*---------------------------------------------------------------*/
+     /* CountryWide                                           Tej1    */
+     /*---------------------------------------------------------------*/
+
+             If        (&File = 'OEPCWEDI')                           +
+                                                                      +
+             Do
+             ChgVar     &FTPDetsRqd     'FTCW'
+             Goto       End                                 /** JM1 **/
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* TwoWay                                                 JM2    */
+     /*---------------------------------------------------------------*/
+
+             If        (&File = 'OEPTWEDI')                           +
+                                                                      +
+             Do
+             ChgVar     &FTPDetsRqd     'FTTW'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Parceline                                                     */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'OEPPLEDI' *Or                        +
+                        &File = 'RTPPLEDI'     )                      +
+                                                                      +
+             Do
+             ChgVar     &FTPDetsRqd     'FTPP'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Parceline - POS and SWOP                                  rh3 */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'ALPPOSORDA' )                        +
+                                                                      +
+             Do
+
+             ChgVar     &Prefix         %Sst( &Member 1 4 )
+
+               If     ( &Prefix = 'EUK_' )                            +
+                                                                      +
+               Do
+               ChgVar   &FTPDetsRqd     'POSW'
+               EndDo
+
+               If     ( &Prefix = 'SWOP' )                            +
+                                                                      +
+               Do
+               ChgVar   &FTPDetsRqd     'SWOP'
+               EndDo
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Flowboth                                                  rh1 */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'OEPFBEDI' )                          +
+                                                                      +
+             Do
+             ChgVar     &FTPDetsRqd     'FTPF'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* DeeSet                                                    gw1 */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'DSPFLATF' )                          +
+                                                                      +
+             Do
+             ChgVar     &FTPDetsRqd     'FTDS'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve FTP details.                                         */
+     /*---------------------------------------------------------------*/
+
+     /**A02****** Call  OER041        ( &FTPDetsRqd           +      */
+     /**A02******                       &IPAddr               +      */
+     /**A02******                       &UserName             +      */
+     /**A02******                       &Password             +      */
+     /**A02                             &ToDir      )  ***************/
+
+     /** A02 Str ***/
+             Call       OER041A       ( &FTPDetsRqd                   +
+                                        &IPAddr                       +
+                                        &UserName                     +
+                                        &Password                     +
+                                        &ToDir                        +
+                                        &EmailAddr  )
+
+     /** A02 End ***/
+
+             RtvObjD    Obj(     &File )                              +
+                        ObjType( *File )                              +
+                        RtnLib(  &Lib  )
+
+             ChgVar      &LibFile (                                   +
+                         &Lib                                   *TCat +
+                        '/'                                     *Cat  +
+                         &File                               )
+
+     /*---------------------------------------------------------------*/
+     /* Prepare FTP Statement                                         */
+     /*---------------------------------------------------------------*/
+
+             ChgVar      &CmdStr (                                    +
+                        'XXSndFTPF '                             *Cat +
+                        'FromFile(' *Cat  &LibFile  *TCat   ') ' *Cat +
+                        'FromMbr('  *Cat  &Member   *TCat   ') ' *Cat +
+                        'ToFile('   *Cat  &ToFile   *TCat   ') ' *Cat +
+                        'ToDir('    *Cat  &ToDir    *TCat   ') ' *Cat +
+                        'RmtSys(''' *TCat &IPAddr   *TCat ''') ' *Cat +
+                        'UsrID('''  *TCat &UserName *TCat ''') ' *Cat +
+                        'PasWrd(''' *TCat &PassWord *TCat ''') ' *Cat +
+                        'SendPAsv(        *Off               ) ' *Cat +
+                                                          ' ')
+
+     /*---------------------------------------------------------------*/
+     /* Attempt File Transfer using FTP                               */
+     /*---------------------------------------------------------------*/
+
+             Retry:
+
+             ChgVar     &Reply          ' '
+
+     /*---------------------------------------------------------------*/
+     /* Wake Up the Firewall by issuing 'Ping' Command            rh4 */
+     /*---------------------------------------------------------------*/
+
+             Ping       RmtSys( &IPAddr )
+
+             Call       Pgm(  QCmdExc )                               +
+                        Parm( &CmdStr                                 +
+                              &CmdLen )
+
+             MonMsg     CPF0000                                       +
+                        Exec(                                         +
+             Do               )
+
+             If       ( &IntBatch = 'I' )                             +
+                                                                      +
+             Do
+             RtvJobA    User( &User )
+             ChgVar     &MsgQ           &User
+             EndDo
+
+             Else                                                     +
+                                                                      +
+/* A1 */     If         Cond(&Count *LT 5) Then(Do)
+/* A1 */        ChgVar     Var(&Count) Value(&Count + 1)
+/* A1 */        DlyJob     Dly(60)
+/* A1 */        Goto       CmdLbl(Retry)
+/* A1 */     EndDo
+                                                                      +
+             Do
+             ChgVar     &MsgQ           QSysOpr
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Parceline                                                     */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'OEPPLEDI'   *Or                      +
+                        &File = 'RTPPLEDI'   *Or                      +
+                        &File = 'ALPPOSORDA'     )                    +
+                                                                      +
+             Do
+
+             SndUsrMsg  Msg('A problem has occured in sending the +
+                          EDI file to Parceline. Check that there +
+                          is no problem with the FTP Server and +
+                          the Firewall. You can enter "r" to +
+                          "Retry" the FTP command or "c" to +
+                          "Cancel" and send the file later.')         +
+                                                                      +
+                        Values( 'R' 'r' 'C' 'c' )                     +
+                        ToMsgQ( &MsgQ           )                     +
+                        MsgRpy( &Reply          )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Flowboth                                                  rh1 */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'OEPFBEDI' )                          +
+                                                                      +
+             Do
+
+             SndUsrMsg  Msg('A problem has occured in sending the +
+                          EDI file to Flowboth. Check that there +
+                          is no problem with the FTP Server and +
+                          the Firewall. You can enter "r" to +
+                          "Retry" the FTP command or "c" to +
+                          "Cancel" and send the file later.')         +
+                                                                      +
+                        Values( 'R' 'r' 'C' 'c' )                     +
+                        ToMsgQ( &MsgQ           )                     +
+                        MsgRpy( &Reply          )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* TwoWay                                                  JM2   */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'OEPTWEDI' )                          +
+                                                                      +
+             Do
+
+             SndUsrMsg  Msg('A problem has occured in sending the +
+                          EDI file to TwoWay. Check that there +
+                          is no problem with the FTP Server and +
+                          the Firewall. You can enter "r" to +
+                          "Retry" the FTP command or "c" to +
+                          "Cancel" and send the file later.')         +
+                                                                      +
+                        Values( 'R' 'r' 'C' 'c' )                     +
+                        ToMsgQ( &MsgQ           )                     +
+                        MsgRpy( &Reply          )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* CountryWide                                             Tej1  */
+     /*---------------------------------------------------------------*/
+
+             If       ( &File = 'OEPCWEDI' )                          +
+                                                                      +
+             Do
+
+             SndUsrMsg  Msg('A problem has occured in sending the +
+                          EDI file to CountryWide. Check that there +
+                          is no problem with the FTP Server and +
+                          the Firewall. You can enter "r" to +
+                          "Retry" the FTP command or "c" to +
+                          "Cancel" and send the file later.')         +
+                                                                      +
+                        Values( 'R' 'r' 'C' 'c' )                     +
+                        ToMsgQ( &MsgQ           )                     +
+                        MsgRpy( &Reply          )
+
+             EndDo
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* If Reply is "Retry"                                           */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Reply = 'R'   *Or                            +
+                        &Reply = 'r' )                                +
+                                                                      +
+             Do
+
+             Goto       Retry
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* If Reply is "Cancel" - Set Failure Flag                       */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Reply = 'C'   *Or                            +
+                        &Reply = 'c' )                                +
+                                                                      +
+             Do
+             ChgVar     &FailPass       'F'
+             EndDo
+
+             Else                                                     +
+                                                                      +
+             Do
+             ChgVar     &FailPass       'P'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Write to Error Log File                                       */
+     /*---------------------------------------------------------------*/
+
+             Call       OER043        ( &File                         +
+                                        &Member                       +
+                                        &ToFile                       +
+                                        &FailPass )
+
+     /*---------------------------------------------------------------*/
+     /* Send Message to History Log                               rh2 */
+     /*---------------------------------------------------------------*/
+
+ /* Successful log message **/
+             If       ( &FailPass = 'P' )                             +
+                                                                      +
+             Do
+
+             ChgVar   &Msg                                            +
+                                                                      +
+                      ( 'File'                    *BCat               +
+                        &ToFile                   *BCat               +
+                        '['                       *Cat                +
+                        &File                     *TCat               +
+                        '.'                       *Cat                +
+                        &Member                   *Cat                +
+                        '] sent successfully to ' *Cat                +
+                        &UserName                       )
+
+
+             SndPgmMsg  Msg(    &Msg    )                             +
+                        ToMsgQ( *HstLog )
+
+ /* Email cnfm.to Dist List only if successful        *** A02 *** **/
+ /** A02 Str ***/
+
+             If         (&EmailAddr = &BlankParm) THEN(GOTO +
+                          CMDLBL(End))
+
+             Chgvar   &EmailSub ('FTP Transfer Email Confirmation')
+
+             ChgVar   &EmailMsg                                       +
+                      ( 'File '                   *BCat               +
+                        &ToFile                   *BCat               +
+                        'sent successfully to'    *BCat               +
+                        &UserName )
+
+             XXMAIL    ToAddr(&EmailAddr)         +
+                       Subject(&EmailSub)         +
+                       Message(&EmailMsg)         +
+                       Attachtype(*None)
+             MonMsg    CPF0000
+
+ /** A02 End ***/
+
+             EndDo
+
+ /* Unsuccessful log message **/
+             If       ( &FailPass = 'F' )                             +
+                                                                      +
+             Do
+
+             ChgVar   &Msg                                            +
+                                                                      +
+                      ( 'File'                    *BCat               +
+                        &ToFile                   *BCat               +
+                        '['                       *Cat                +
+                        &File                     *TCat               +
+                        '.'                       *Cat                +
+                        &Member                   *Cat                +
+                        '] had FTP Error with '   *Cat                +
+                        &UserName                       )
+
+
+             SndPgmMsg  Msg(    &Msg    )                             +
+                        ToMsgQ( *HstLog )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* End Program                                                   */
+     /*---------------------------------------------------------------*/
+
+End:
+
+EndPgm

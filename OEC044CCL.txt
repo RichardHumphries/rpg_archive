@@ -1,0 +1,186 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   FTP File Transmission Processing for FlowBoth      */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Entertainment U.K. Ltd.                            */
+     /* Date:      3rd August 2004                                    */
+     /*                                                               */
+     /* This is a version of OEC044CL (Used for Parcel Line).         */
+     /* Any change in either should be kept Consistent.               */
+     /*                                                               */
+     /* Title:     Receive FTP Files from FlowBoth                    */
+     /* Program:   OEC044CCL                                          */
+     /* Scan:                                                         */
+     /*                                                               */
+     /*---------------------------------------------------------------*/
+     /*===============================================================*/
+     /* AMENDMENTS HISTORY                                            */
+     /* ==================                                            */
+     /*                                                               */
+     /* Ref Description                        Amended By     Date    */
+     /* --- ---------------------------------- -------------  ------- */
+     /* A01 Send IP Address to XXCHKHOST as    J. McGuire     20Feb05 */
+     /*     a 64 character parameter.                                 */
+     /*                                                               */
+     /* A02 Call OER044C instead of            R. Humphries   11Mar05 */
+     /*     OER044B                                                   */
+     /*                                                               */
+     /*===============================================================*/
+
+             Pgm
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &FTPDetsRqd *Char   Len(   4   )
+             Dcl        &FailPass   *Char   Len(   1   )
+             Dcl        &ToDir      *Char   Len(  30   )
+             Dcl        &IPAddr     *Char   Len(  30   )
+             Dcl        &UserName   *Char   Len(  30   )
+             Dcl        &Password   *Char   Len(  30   )
+             Dcl        &Reply      *Char   Len(   1   )
+/* A01 */    Dcl        &RmtSys     *Char   Len(  64   )
+             Dcl        &MsgQ       *Char   Len(  10   )
+             Dcl        &IPAdd2     *Char   Len(  64   )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve FTP Details                                          */
+     /* (Use Type "FTFB" to get details from Desc. File)              */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     &FTPDetsRqd     'FTFB'
+
+             Call       OER041        ( &FTPDetsRqd                   +
+                                        &IPAddr                       +
+                                        &UserName                     +
+                                        &Password                     +
+                                        &ToDir      )
+
+             ChgVar     Var(   &IPAdd2 )                              +
+                        Value( &IPAddr )
+
+     /*---------------------------------------------------------------*/
+     /* Check if Remote Box is Responding                             */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     &MsgQ           QSysOpr
+
+             Retry:
+
+/* A01 ******Call       XXChkHost     ( &IPAdd2 ) ********************/
+
+/* A01 */    ChgVar     &RmtSys         &IPAddr
+/* A01 */    Call       XXChkHost     ( &RmtSys )
+
+             MonMsg     CPF9898                                       +
+                        Exec(                                         +
+             Do               )
+
+             SndUsrMsg  Msg('A problem has occured trying to +
+                          establish a connection with FlowBoth. +
+                          Check that there is no problem with the FTP +
+                          Server and the Firewall. You can enter "r" +
+                          to "Retry" the FTP command or "c" to +
+                          "Cancel" and try again later.')             +
+                                                                      +
+                        Values( 'R' 'r' 'C' 'c' )                     +
+                        ToMsgQ( &MsgQ           )                     +
+                        MsgRpy( &Reply          )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* If Reply is "Retry"                                           */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Reply = 'R'   *Or                            +
+                        &Reply = 'r' )                                +
+                                                                      +
+             Do
+
+             Goto       Retry
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* If Reply is "Cancel" - Set Failure Flag                       */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Reply = 'C'   *Or                            +
+                        &Reply = 'c' )                                +
+                                                                      +
+             Do
+             ChgVar     &FailPass       'F'
+             Goto       End
+             EndDo
+
+             Else                                                     +
+                                                                      +
+             Do
+             ChgVar     &FailPass       'P'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Prepare FTP Environment                                       */
+     /*---------------------------------------------------------------*/
+
+             AddPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECFBR   )
+
+             MonMsg     MsgId(  CPF0000  )
+
+
+             AddPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECFBREr )
+
+             MonMsg     MsgId(  CPF0000  )
+
+             ClrPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECFBR   )
+
+             ClrPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECFBREr )
+
+             OvrDBF     File(   Input    )                            +
+                        ToFile( QFTPSrc  )                            +
+                        Mbr(    OECFBR   )
+
+             OvrDBF     File(   OutPut   )                            +
+                        ToFile( QFTPSrc  )                            +
+                        Mbr(    OECFBREr )
+
+             OvrDBF     File(   QFTPSrc  )                            +
+                        Mbr(    OECFBR   )
+
+     /*---------------------------------------------------------------*/
+     /* Generate FTP Source                                           */
+     /*---------------------------------------------------------------*/
+
+             Call       OER044C       ( &UserName                     +
+                                        &Password )
+
+     /*---------------------------------------------------------------*/
+     /* Wake Up the Firewall by issuing 'Ping' Command                */
+     /*---------------------------------------------------------------*/
+
+             Ping       RmtSys( &IPAddr  )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve Files form FlowBoth using FTP                        */
+     /*---------------------------------------------------------------*/
+
+             FTP        RmtSys( &IPAddr  )
+
+     /*---------------------------------------------------------------*/
+     /* Delete All Overrides                                          */
+     /*---------------------------------------------------------------*/
+
+             DltOvr     File(   *All     )
+
+     /*---------------------------------------------------------------*/
+     /* End Program                                                   */
+     /*---------------------------------------------------------------*/
+
+End:
+
+EndPgm

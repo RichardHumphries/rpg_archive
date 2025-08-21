@@ -1,0 +1,103 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   FTP File Transmission Processing                   */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Sunflower Software Solutions Ltd.                  */
+     /* Date:      17th April 2001                                    */
+     /*                                                               */
+     /* Title:     Populate File Transmission Member List File        */
+     /* Program:   OEC040CL                                           */
+     /* Scan:                                                         */
+     /*---------------------------------------------------------------*/
+
+Pgm                     Parm( &EDIFileN )
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &MsgTxt     *Char   Len( 120   )              +
+                                                                      +
+                        Value('File OEPFTML is Locked - Only 1 screen +
+                               at a time per 1 user')
+
+             Dcl        &EDIFileN   *Char   Len(  10   )
+             Dcl        &User       *Char   Len(  10   )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve Job Name                                             */
+     /*---------------------------------------------------------------*/
+
+             RtvJobA    User( &User )
+
+     /*---------------------------------------------------------------*/
+     /* Create Member in file OEPFTML for each user                   */
+     /*---------------------------------------------------------------*/
+
+             RmvM       File( OEPFTML )                               +
+                        Mbr(  &User   )
+
+             MonMsg     CPF7310
+
+             MonMsg     CPF3203 Exec( Do )
+             SndMsg     Msg(    &MsgTxt  )                            +
+                        ToUsr(  &User    )
+             Goto       End
+             EndDo
+
+             AddPFM     File( OEPFTML )                               +
+                        Mbr(  &User   )
+
+     /*---------------------------------------------------------------*/
+     /* Populate File Transmission Member File                        */
+     /*---------------------------------------------------------------*/
+
+             DltF       File(     QTemp/TmPFTML   )
+
+             MonMsg     MsgID(    CPF0000         )
+
+             DspFD      File(     &EDIFileN       )                   +
+                        Type(     *MbrList        )                   +
+                        Output(   *OutFile        )                   +
+                        OutFile(  QTemp/TmPFTML   )                   +
+                        OutMbr(   *First                              +
+                                  *Add            )
+
+             CpyF       FromFile( QTemp/TmPFTML   )                   +
+                        ToFile(   OEPFTML         )                   +
+                        ToMbr(    &User           )                   +
+                        MbrOpt(   *Add            )                   +
+                        FmtOpt(   *Map                                +
+                                  *Drop           )
+
+     /*---------------------------------------------------------------*/
+     /* Override Physical File Member                                 */
+     /*---------------------------------------------------------------*/
+
+             OvrDBF     File( OEPFTML )                               +
+                        Mbr(  &User   )
+
+     /*---------------------------------------------------------------*/
+     /* Call Screen                                                   */
+     /*---------------------------------------------------------------*/
+
+             Call       Pgm(  OER040    )                             +
+                        Parm( &EDIFileN )
+
+     /*---------------------------------------------------------------*/
+     /* Remove Override and Delete Member                             */
+     /*---------------------------------------------------------------*/
+
+             DltOvr     File(  OEPFTML )
+
+     /*---------------------------------------------------------------*/
+     /* Remove Member in file OEPFTML                                 */
+     /*---------------------------------------------------------------*/
+
+             RmvM       File(  OEPFTML )                              +
+                        Mbr(   &User   )
+
+             MonMsg     MsgID( CPF0000 )
+
+End:
+
+EndPgm

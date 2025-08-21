@@ -1,0 +1,181 @@
+     /*---------------------------------------------------------------*/
+     /* Project:   FTP File Transmission Processing                   */
+     /* Developer: Richard Humphries                                  */
+     /* Company:   Sunflower Software Solutions Ltd.                  */
+     /* Date:      3rd May 2001                                       */
+     /*                                                               */
+     /* Title:     Receive FTP Files from Parceline                   */
+     /* Program:   OEC044CL                                           */
+     /* Scan:                                                         */
+     /*                                                               */
+     /* Modified:  16/07/2001                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Ping IP Address before issuing FTP Command         */
+     /* Scan:      rh1                                                */
+     /*                                                               */
+     /* Modified:  15/01/2002                                         */
+     /* by:        Richard Humphries                                  */
+     /* Reason:    Possibility of a loop if 'r' taken as answer       */
+     /* Scan:      rh2                                                */
+     /*                                                               */
+     /* Modified:  20th February 2005                                 */
+     /* by:        Julian McGuire                                     */
+     /* Reason:    Send IP Address to XXCHKHOST as 64 char. parm.     */
+     /* Scan:      A03                                                */
+     /*---------------------------------------------------------------*/
+
+Pgm
+
+     /*---------------------------------------------------------------*/
+     /* Declare Variables                                             */
+     /*---------------------------------------------------------------*/
+
+             Dcl        &FTPDetsRqd *Char   Len(   4   )
+             Dcl        &FailPass   *Char   Len(   1   )
+             Dcl        &ToDir      *Char   Len(  30   )
+             Dcl        &IPAddr     *Char   Len(  30   )
+             Dcl        &UserName   *Char   Len(  30   )
+             Dcl        &Password   *Char   Len(  30   )
+             Dcl        &Reply      *Char   Len(   1   )
+/* A03 */    Dcl        &RmtSys     *Char   Len(  64   )
+             Dcl        &MsgQ       *Char   Len(  10   )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve FTP Details                                          */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     &FTPDetsRqd     'FTPP'
+
+             Call       OER041        ( &FTPDetsRqd                   +
+                                        &IPAddr                       +
+                                        &UserName                     +
+                                        &Password                     +
+                                        &ToDir      )
+
+     /*---------------------------------------------------------------*/
+     /* Check if Remote Box is Responding                             */
+     /*---------------------------------------------------------------*/
+
+             ChgVar     &MsgQ           QSysOpr
+
+             Retry:
+
+             ChgVar     &Reply          ' '
+
+/* A03 ******Call       XXChkHost     ( &IPAddr ) ********************/
+
+/* A03 */    ChgVar     &RmtSys         &IPAddr
+/* A03 */    Call       XXChkHost     ( &RmtSys )
+
+             MonMsg     CPF9898                                       +
+                        Exec(                                         +
+             Do               )
+
+             SndUsrMsg  Msg('A problem has occured trying to +
+                          establish a connection with Parceline.  +
+                          Check that there is no problem with the FTP +
+                          Server and the Firewall. You can enter "r" +
+                          to "Retry" the FTP command or "c" to +
+                          "Cancel" and try again later.')             +
+                                                                      +
+                        Values( 'R' 'r' 'C' 'c' )                     +
+                        ToMsgQ( &MsgQ           )                     +
+                        MsgRpy( &Reply          )
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* If Reply is "Retry"                                           */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Reply = 'R'   *Or                            +
+                        &Reply = 'r' )                                +
+                                                                      +
+             Do
+
+             Goto       Retry
+
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* If Reply is "Cancel" - Set Failure Flag                       */
+     /*---------------------------------------------------------------*/
+
+             If       ( &Reply = 'C'   *Or                            +
+                        &Reply = 'c' )                                +
+                                                                      +
+             Do
+             ChgVar     &FailPass       'F'
+             Goto       End
+             EndDo
+
+             Else                                                     +
+                                                                      +
+             Do
+             ChgVar     &FailPass       'P'
+             EndDo
+
+     /*---------------------------------------------------------------*/
+     /* Prepare FTP Environment                                       */
+     /*---------------------------------------------------------------*/
+
+             AddPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECPlR   )
+
+             MonMsg     MsgId(  CPF0000  )
+
+
+             AddPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECPlREr )
+
+             MonMsg     MsgId(  CPF0000  )
+
+             ClrPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECPlR   )
+
+             ClrPFM     File(   QFTPSrc  )                            +
+                        Mbr(    OECPlREr )
+
+             OvrDBF     File(   Input    )                            +
+                        ToFile( QFTPSrc  )                            +
+                        Mbr(    OECPlR   )
+
+             OvrDBF     File(   OutPut   )                            +
+                        ToFile( QFTPSrc  )                            +
+                        Mbr(    OECPLREr )
+
+             OvrDBF     File(   QFTPSrc  )                            +
+                        Mbr(    OECPlR   )
+
+     /*---------------------------------------------------------------*/
+     /* Generate FTP Source                                           */
+     /*---------------------------------------------------------------*/
+
+             Call       OER044        ( &UserName                     +
+                                        &Password )
+
+     /*---------------------------------------------------------------*/
+     /* Wake Up the Firewall by issuing 'Ping' Command            rh1 */
+     /*---------------------------------------------------------------*/
+
+             Ping       RmtSys( &IPAddr  )
+
+     /*---------------------------------------------------------------*/
+     /* Retrieve Files form Parceline using FTP                       */
+     /*---------------------------------------------------------------*/
+
+             FTP        RmtSys( &IPAddr  )
+
+     /*---------------------------------------------------------------*/
+     /* Delete All Overrides                                          */
+     /*---------------------------------------------------------------*/
+
+             DltOvr     File(   *All     )
+
+     /*---------------------------------------------------------------*/
+     /* End Program                                                   */
+     /*---------------------------------------------------------------*/
+
+End:
+
+EndPgm

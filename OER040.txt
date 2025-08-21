@@ -1,0 +1,449 @@
+      *---------------------------------------------------------------*
+      * Project:   New Returns Warehouse Processing                   *
+      * Developer: Richard Humphries                                  *
+      * Company:   M.M.T. Computing PLC                               *
+      * Date:      23rd April 2001                                    *
+      *                                                               *
+      * Title:     Carrier File Transmission Log                      *
+      * Program:   OER040                                             *
+      * Scan:                                                         *
+      *                                                               *
+      * Modified:  1/9/2004                                           *
+      * by:        Richard Humphries                                  *
+      * Reason:    Add processing for FlowBoth                        *
+      * Scan:      a1                                                 *
+      *                                                               *
+      * Modified:  15/6/2006                                          *
+      * by:        Richard Humphries                                  *
+      * Reason:    Use OEC041CCL for all Re-transmissions             *
+      * Scan:      a2                                                 *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+      *  File Transmission Member List File
+
+     FOEPFTML   IF   E           K Disk
+
+      *  File Transmission Error Log File
+
+     FOEPFTEL   IF   E           K Disk
+
+      *  Display File
+
+     FOED040FT  CF   E             WorkStn InfDs( InfDs )
+     F                                     Sfile( CSfl:   CRrn   )
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D InfDs           DS
+     D Key                   369    369
+     D PagRrn                378    379B 0
+
+      * Program Status Data Structure
+
+     D                SDs
+     D QProg             *Proc
+     D QJob                  244    253
+     D QUser                 254    263
+
+      * External Data Structure for *LDA
+
+     D LDA           E DS                  ExtName( LDA )
+
+      * Named hexadecimal constants for function keys
+
+     D F03             C                   X'33'
+     D F12             C                   X'3C'
+     D PageDn          C                   X'F5'
+
+      * work fields
+
+     D #Fold           C                   '0'
+     D #Drop           C                   '1'
+     D CRrn            S              5  0
+     D CRrnSve         S              5  0
+     D P1FPFg          S              1
+     D P1IntB          S              1
+     D CmdStr          S            256
+     D CmdLen          S             15P 5 Inz( 256 )
+     D WkYear          S              4
+     D WkMonth         S              2
+     D WkDay           S              2
+     D PrvDatYMD       S              6
+
+     D NowStm          S               Z
+
+      * Key Kists
+
+     C     KeyOEPFTMLP   KList
+     C                   KFld                    MLFile
+     C                   KFld                    MLName
+
+     C     KeyOEPFTML    KList
+     C                   KFld                    MLFile
+
+     C     KeyOEPFTEL    KList
+     C                   KFld                    MLFile
+     C                   KFld                    MLName
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+      * Position file at beginning (in case of SHARE(*YES))
+
+     C     KeyOEPFTMLP   SetLL     OEPFTML
+
+      * Mainline logic
+
+  b1 C                   DoU       Key = F03 Or
+     C                             Key = F12
+
+      * Fill subfile
+
+     C                   ExSr      @Load
+
+      * Check for existing subfile records to condition SFLDSP
+
+  b2 C                   If        CRrn  > 0
+     C                   Eval      *IN42 = *On
+  x2 C                   Else
+     C                   Eval      *IN42 = *Off
+  e2 C                   EndIf
+
+      * Display selection window
+
+  b2 C                   DoU       Key = F03
+
+     C                   Write     CSflCmd
+     C                   Eval      *IN41 = *On
+     C                   ExFmt     CSflCtl
+     C                   Eval      *IN41 = *Off
+
+      * Initialize SflRcdNbr value with PagRrn value from
+      * I/O feedback area -- the lowest subfile RRN on the
+      * current subfile display. Ensures that proper page is
+      * redisplayed.
+
+     C                   Eval      RcdNbr = PagRrn
+
+      * Exit or Cancel request
+
+  b3 C                   If        Key = F03 Or
+     C                             Key = F12
+     C                   Leave
+  e3 C                   EndIf
+
+      * User request position
+
+  b3 C                   If        NName  <> *Blanks
+     C                   Eval      S1Name =  NName
+     C                   Eval      MLName =  NName
+     C                   ExSr      @Repos
+     C                   Leave
+  e3 C                   EndIf
+
+      * Page down for more records
+
+  b3 C                   If        Key = PageDn
+     C                   Leave
+  e3 C                   EndIf
+
+      * Did user make a selection?
+
+     C                   ReadC     CSfl                                 9898
+
+  b3 C                   DoW       *IN98 = *Off
+
+      * Execute for appropriate selections
+
+      * Re-Transmit selected
+
+  b4 C                   If        ( Selio  = '1 '   Or
+     C                               SelIo  = ' 1'   Or
+     C                               SelIo  = '01' )
+
+     C                   ExSr      @ReTransmit
+
+  b5 C                   If        Key = F03
+     C                   Leave
+  e5 C                   EndIf
+
+     C                   Eval      SelIo = '  '
+     C                   Update    CSfl
+     C                   Eval      RcdNbr = CRrn
+
+  e4 C                   EndIf
+
+      * Display Member selected
+
+  b4 C                   If        ( Selio  = '5 '   Or
+     C                               SelIo  = ' 5'   Or
+     C                               SelIo  = '05' )
+
+     C                   ExSr      @DisplayMbr
+
+  b5 C                   If        Key = F03
+     C                   Leave
+  e5 C                   EndIf
+
+     C                   Eval      SelIo = '  '
+     C                   Update    CSfl
+     C                   Eval      RcdNbr = CRrn
+
+  e4 C                   EndIf
+
+     C                   ReadC     CSfl                                   98
+  e3 C                   EndDo
+
+  e2 C                   EndDo
+  e1 C                   EndDo
+
+      * End of Program
+
+     C                   Eval      *InLR = *On
+     C                   Return
+
+      *==============================================================*
+      * Reposition subfile for "Position to" entry                   *
+      *==============================================================*
+
+     C     @Repos        BegSr
+
+      * Clear subfile
+
+     C                   Eval      *IN40 = *On
+     C                   Write     CSflCtl
+     C                   Eval      *IN40 = *Off
+
+      * Reset subfile relative record number
+
+     C                   Reset                   CRrn
+     C                   Reset                   CRrnSve
+
+      * Position file by partial entry NcName in display file
+
+     C     KeyOEPFTMLP   SetLL     OEPFTML
+
+     C                   EndSr
+
+      *==============================================================*
+      * Load subfile records                                         *
+      *==============================================================*
+
+     C     @Load         BegSr
+
+      * Reset last subfile relative record number
+
+     C                   Eval      CRrn = CRrnSve
+
+      * To ensure new subfile page is displayed RcdNbr=SFLRcdNbr
+      * and cursor is placed in first record on subfile
+
+     C                   Eval      RcdNbr = CRrn + 1
+
+      * Load twelve records to a page
+
+  b1 C                   Do        12
+
+     C     KeyOEPFTML    ReadE     OEPFTML                                99
+
+  b2 C                   If        *In99 = *On
+
+  b3 C                   If        RcdNbr > CRrn
+     C                   Eval      RcdNbr = CRrn
+  e3 C                   EndIf
+
+     C                   Leave
+
+  e2 C                   EndIf
+
+     C                   Eval      CRrn = CRrn + 1
+     C                   Clear                   SelIo
+
+      *  Populate fields
+
+     C                   Eval      S1Name = MLName
+     C                   Eval      S1NRcd = MLNRcd
+     C                   Eval      S1CDat = %SubSt( MLCDat:5:2 ) + '/' +
+     C                                      %SubSt( MLCDat:3:2 ) + '/' +
+     C                                      %SubSt( MLCDat:1:2 ) + '/'
+
+     C     KeyOEPFTEL    Chain     OEPFTEL
+
+  b2 C                   If        %Found ( OEPFTEL )
+     C                   Eval      S1ToFl = ELToFl
+     C                   Eval      S1FPFg = ELFPFg
+     C                   Else
+     C                   Clear                   S1ToFl
+     C                   Clear                   S1FPFg
+  e2 C                   EndIf
+
+      * Highlight Failed Members in Reverse Image
+
+     C                   Eval      *In60  = *Off
+
+  b2 C                   If        S1FPFg = 'F'
+     C                   Eval      *In60  = *On
+  e2 C                   EndIf
+
+     C                   Write     CSfl
+
+     C                   Clear                   S1Name
+     C                   Clear                   S1NRcd
+     C                   Clear                   S1CDat
+     C                   Clear                   S1ToFl
+     C                   Clear                   S1FPFg
+
+     C                   Clear                   MLName
+     C                   Clear                   MLNRcd
+     C                   Clear                   MLCDat
+
+  e1 C                   EndDo
+
+      * Save last subfile record number
+
+     C                   Eval      CRrnSve = CRrn
+
+      * Determine which subfile mode (drop or fold)
+      * is current, and display new records in that mode
+
+  b1 C                   If        SfMode = #Fold
+     C                   Eval      *IN10 = *Off
+  x1 C                   Else
+     C                   Eval      *IN10 = *On
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *===============================*
+      * ReTransmit File               *
+      *===============================*
+
+     C     @ReTransmit   BegSr
+
+     C                   Eval      P1FPFg =      *Blanks
+     C                   Eval      P1IntB =      'I'
+
+a1b1 C* a2 **************If        MLFile      = 'OEPFBEDI'
+|    C                   Call      'OEC041CCL'
+|    C                   Parm                    S1File
+|    C                   Parm                    S1Name
+|    C                   Parm                    S1ToFl
+|    C                   Parm                    P1FPFg
+|    C                   Parm                    P1IntB
+a1x1 C* a2 **************Else
+     C* a2 **************Call******'OEC041CL'
+     C* a2 **************Parm********************S1File
+     C* a2 **************Parm********************S1Name
+     C* a2 **************Parm********************S1ToFl
+     C* a2 **************Parm********************P1FPFg
+     C* a2 **************Parm********************P1IntB
+a1   C* a2 **************EndIf
+
+     C                   Eval      S1FPFg =      P1FPFg
+
+     C                   Eval      *In60  = *Off
+
+  b1 C                   If        S1FPFg = 'F'
+     C                   Eval      *In60  = *On
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *===============================*
+      * Display Member                *
+      *===============================*
+
+     C     @DisplayMbr   BegSr
+
+     C                   Eval      CmdStr = 'DspPFM File(' +
+     C                                       S1File        +
+     C                                      ') Mbr('       +
+     C                                       S1Name        +
+     C                                      ')'
+
+     C                   Call      'QCMDEXC'
+     C                   Parm                    CmdStr
+     C                   Parm                    CmdLen
+
+     C                   Eval      *In60  = *Off
+
+  b1 C                   If        S1FPFg = 'F'
+     C                   Eval      *In60  = *On
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *========================*
+      * *InzSR                 *
+      *========================*
+
+     C     *InzSr        BegSr
+
+      * Entry Parameters
+
+     C     *Entry        PList
+     C                   Parm                    MLFile
+
+      * Variable initializations
+
+     C                   Eval      CRrn    = 0
+     C                   Eval      CRrnSve = 0
+
+      * Set MODE to 0=Folded for first load of subfile
+      * SFLMODE(&SfMode) in DDS
+
+     C                   Eval      SfMode = #Drop
+     C                   Eval      *In52  = *On
+
+      * Retrieve Company Description
+
+     C                   Eval      S1CoNm = '01 - Entertainment UK Ltd'
+     C                   Eval      S1File = MLFile
+
+      *---------------------------------------------------------------*
+      *  Delete all records from the last century                     *
+      *---------------------------------------------------------------*
+
+     C/Exec Sql
+     C+
+     C+   Delete
+     C+
+     C+     from   OEPFTML
+     C+
+     C+    where   MLCDat > '400101'
+     C+
+     C/End-Exec
+
+      *---------------------------------------------------------------*
+      *  Delete all records older than 30 days                        *
+      *---------------------------------------------------------------*
+
+     C                   Time                    NowStm
+     C     NowStm        SubDur    30:*Days      NowStm
+
+     C                   Extrct    NowStm:*Y     WkYear
+     C                   Extrct    NowStm:*M     WkMonth
+     C                   Extrct    NowStm:*D     WkDay
+
+     C                   Eval      PrvDatYMD   = %SubSt( WKYear  :3:2) +
+     C                                                   WkMonth       +
+     C                                                   WkDay
+
+     C/Exec Sql
+     C+
+     C+   Delete
+     C+
+     C+     from   OEPFTML
+     C+
+     C+    where   MLCDat < :PrvDatYMD
+     C+
+     C/End-Exec
+
+     C                   EndSr

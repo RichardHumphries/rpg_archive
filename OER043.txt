@@ -1,0 +1,82 @@
+      *---------------------------------------------------------------*
+      * Project:   FTP File Transmission Processing                   *
+      * Developer: Richard Humphries                                  *
+      * Company:   M.M.T. Computing PLC                               *
+      * Date:      26th April 2001                                    *
+      *                                                               *
+      * Title:     Update FTP Error Log File                          *
+      * Program:   OER043                                             *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D P1File          S             10
+     D P1Name          S             10
+     D P1ToFl          S             30
+     D P1FPFg          S              1
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  Delete Record of member - if one exists                      *
+      *---------------------------------------------------------------*
+
+     C/Exec Sql
+     C+
+     C+   Delete
+     C+
+     C+     from   OEPFTEL
+     C+
+     C+    where   ELFile = :P1File And
+     C+            ELName = :P1Name
+     C+
+     C/End-Exec
+
+      *---------------------------------------------------------------*
+      *  Add record for File Member                                   *
+      *---------------------------------------------------------------*
+
+     C/Exec Sql
+     C+
+     C+ Insert into OEPFTEL (
+     C+                        ELFile ,
+     C+                        ELName ,
+     C+                        ELToFl ,
+     C+                        ELFPFg
+     C+                                 )
+     C+
+     C+ Values              (
+     C+                       :P1File ,
+     C+                       :P1Name ,
+     C+                       :P1ToFl ,
+     C+                       :P1FPFg
+     C+                                 )
+     C/End-Exec
+
+     C                   Eval      *InLR = *On
+     C                   Return
+
+      *========================*
+      * *INZSR                 *
+      *========================*
+
+     C     *InzSR        BegSr
+
+      * Entry parameters
+
+     C     *Entry        PList
+     C                   Parm                    P1File
+     C                   Parm                    P1Name
+     C                   Parm                    P1ToFl
+     C                   Parm                    P1FPFg
+
+     C                   EndSr

@@ -1,0 +1,260 @@
+      *---------------------------------------------------------------*
+      * Project:   Supplier Returns Lotus Notes Interface             *
+      * Developer: Richard Humphries                                  *
+      * Company:   S.S.S. Ltd.                                        *
+      * Date:      21st November 2001                                 *
+      *                                                               *
+      * Title:     Supplier Return Upload from Lotus Notes            *
+      * Program:   LNR045                                             *
+      * Scan:                                                         *
+      *---------------------------------------------------------------*
+
+      *---------------------------------------------------------------*
+      *  File Specifications                                          *
+      *---------------------------------------------------------------*
+
+      * Supplier Returns Interface Upload File
+
+     FLNPSRIU   UP   E           K Disk
+
+      * Returns Tracking Header File
+
+     FSRLTrkH1  UF   E           K Disk
+
+      * Returns Tracking Detail File
+
+     FSRLTrkI1  UF   E           K Disk
+
+      * Supplier Returns Interface Control File
+
+     FLNPSRIC   UF   E           K Disk
+
+      * PRF Address File
+
+     FLNPPFAd   UF A E           K Disk
+
+      *---------------------------------------------------------------*
+      *  Definition Specifications                                    *
+      *---------------------------------------------------------------*
+
+     D                 Ds
+     D TodayDatTim                     Z   Inz
+     D TodaysDate                      D   DatFmt( *ISO )
+     D                                     OverLay( TodayDatTim )
+
+     D Company         S              2    Inz('01')
+     D IUItem15        S             15
+     D WkYear          S              4P 0
+     D WkMonth         S              2P 0
+     D WkDay           S              2P 0
+
+      *---------------------------------------------------------------*
+      *  Key Lists                                                    *
+      *---------------------------------------------------------------*
+
+     C     KeySRLTrkH1   KList
+     C                   KFld                    Company
+     C                   KFld                    IUPRFN
+
+     C     KeySRLTrkI1   KList
+     C                   KFld                    Company
+     C                   KFld                    IUPRFN
+     C                   KFld                    IUItem15
+
+     C     KeyLNPPFAd    KList
+     C                   KFld                    IUPRFN
+
+      *---------------------------------------------------------------*
+      *  Mainline                                                     *
+      *---------------------------------------------------------------*
+
+  b1 C                   If        IURTyp = 'SRHeader'
+     C                   ExSr      @UpdateHeader
+  x1 C                   Else
+     C                   ExSr      @UpdateDetail
+  e1 C                   EndIf
+
+     C                   Delete    LNRSRIU
+
+     CLR                 ExSr      @LastRecord
+
+      *==============================================================*
+      * Update Header Record                                         *
+      *==============================================================*
+
+     C     @UpdateHeader BegSr
+
+     C     KeySRLTrkH1   Chain     SRLTrkH1
+
+  b1 C                   If        %Found ( SRLTrkH1 )
+
+     C                   Eval      THADat      = ( ( WkYear  -  1900 )
+     C                                                       * 10000 ) +
+     C                                             ( WKMonth *   100 ) +
+     C                                             ( WkDay           )
+
+     C                   Eval      THAUni      = IUAUni
+
+  b2 C                   If        THRUni     <> *Zeros
+     C                   Eval      THAVal      = IUAUni  * (
+     C                                           THRVal  /
+     C                                           THRUni )
+  x2 C                   Else
+     C                   Eval      THAVal      = *Zeros
+  e2 C                   EndIf
+
+     C                   Eval      THRANo      = IURANo
+
+  b2 C                   If        THAUni      = *Zeros
+     C                   Eval      THStat      = 'X'
+  x2 C                   Else
+     C                   Eval      THStat      = 'V'
+  e2 C                   EndIf
+
+     C                   Update    SRPTrakHr
+
+      * Check if Address Corrections have been received
+
+  b2 C                   If        IUAdd1 = *Blanks And
+     C                             IUAdd2 = *Blanks And
+     C                             IUAdd3 = *Blanks And
+     C                             IUAdd4 = *Blanks And
+     C                             IUAdd5 = *Blanks And
+     C                             IUPCod = *Blanks
+  x2 C                   Else
+
+      * Populate PRF Address File
+
+     C     KeyLNPPFAd    Chain     LNPPFAd
+
+     C                   Eval      PFPRFN = IUPRFN
+     C                   Eval      PFVndr = THSupp
+     C                   Eval      PFSAd2 = IUAdd2
+     C                   Eval      PFSAd3 = IUAdd3
+     C                   Eval      PFSAd4 = IUAdd4
+     C                   Eval      PFSAd5 = IUAdd5
+     C                   Eval      PFPCod = IUPCod
+     C                   Eval      PFDate = TodaysDate
+
+  b3 C                   If        %Found ( LNPPFAd )
+     C                   Update    LNRPFAd
+  x3 C                   Else
+     C                   Write     LNRPFAd
+  e3 C                   EndIf
+
+  e2 C                   EndIf
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *==============================================================*
+      * Update Detail Record                                         *
+      *==============================================================*
+
+     C     @UpdateDetail BegSr
+
+     C                   Eval      IUItem15    = IUItem
+
+     C     KeySRLTrkI1   Chain     SRLTrkI1
+
+  b1 C                   If        %Found ( SRLTrkI1 )
+
+     C                   Eval      TIAUni      = IUAUni
+
+  b2 C                   If        TIRUni     <> *Zeros
+     C                   Eval      TIAVal      = IUAUni  * (
+     C                                           TIRVal  /
+     C                                           TIRUni )
+  x2 C                   Else
+     C                   Eval      TIAVal      = *Zeros
+  e2 C                   EndIf
+
+     C                   Eval      TIRANo      = IURANo
+
+  b2 C                   If        TIAUni      = *Zeros
+     C                   Eval      TIStat      = 'X'
+  x2 C                   Else
+     C                   Eval      TIStat      = 'V'
+  e2 C                   EndIf
+
+     C                   Update    SRPTrkDIR
+
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *==============================================================*
+      * Last Record processing                                       *
+      *==============================================================*
+
+     C     @LastRecord   BegSr
+
+      * Deallocate Control File
+
+     C                   Eval      ICFile = 'LNPSRIH   '
+
+     C     ICFile        Chain     LNPSRIC
+
+  b1 C                   If        %Found ( LNPSRIC )
+     C                   Eval      ICFlag = 'FREE      '
+     C                   Update    LNRSRIC
+  e1 C                   EndIf
+
+     C                   EndSr
+
+      *==============================================================*
+      * *InzSr                                                       *
+      *==============================================================*
+
+     C     *InzSr        Begsr
+
+      * Allocate Control File before Processing
+
+  b1 C                   Do        *HiVal
+
+     C                   Eval      ICFile = 'LNPSRIH   '
+
+     C     ICFile        Chain(N)  LNPSRIC
+
+  b2 C                   If        %Found ( LNPSRIC )
+
+  b3 C                   Select
+
+  s3 C                   When      ICFlag = 'NOTES LOCK' Or
+     C                             ICFlag = 'AS400LOCK ' Or
+     C                             ICFlag = 'FREE      '
+
+     C                   Eval      *InLR  = *On
+     C                   Return
+
+  s3 C                   When      ICFlag = 'N UPLOAD  '
+
+     C                   Eval      ICFile = 'LNPSRIH   '
+
+     C     ICFile        Chain     LNPSRIC
+
+  b4 C                   If        %Found ( LNPSRIC )
+     C                   Eval      ICFlag = 'AS400LOCK '
+     C                   Update    LNRSRIC
+     C                   Leave
+  e4 C                   EndIf
+
+  e3 C                   EndSl
+
+  x2 C                   Else
+
+     C                   Eval      *InLR  = *On
+     C                   Return
+     C                   Leave
+
+  e2 C                   EndIf
+
+  e1 C                   EndDo
+
+     C                   Time                    TodayDatTim
+
+     C                   Extrct    TodayDatTim:*YWkYear
+     C                   Extrct    TodayDatTim:*MWkMonth
+     C                   Extrct    TodayDatTim:*DWkDay
+
+     C                   EndSr
